@@ -46,6 +46,22 @@ The model fits a full quadratic response surface to FEA compliance $C=|\delta|/P
 
 The fitted scale multiplies all ply elastic and shear moduli, so the corresponding laminate bending stiffness $D_{\mathrm{eff}}$ and transverse shear stiffness $S_{\mathrm{eff}}$ change together. This single-parameter model does not identify separate bending and shear stiffness corrections. The config sets the initial scale and the scale used to generate the analytical reference; both are 1.0 for the nominal benchmark. For future physical calibration, the reference scale is replaced by measured responses, not treated as a known physical value.
 
+### Test sensitivity to calibration observations
+
+Use the existing sweep to compare 1, 2, 3, and 5 analytical calibration observations without rerunning MAPDL:
+
+```powershell
+python src/analyze_calibration_sensitivity.py `
+  --input results/quadratic_run_2026-10-17_direct_stiffness_calibration/quadratic_sweep.csv `
+  --config config.quadratic.example.json `
+  --layup layup.json `
+  --output-dir results/calibration_sensitivity_2026-10-17 `
+  --counts 1 2 3 5 `
+  --repetitions 30
+```
+
+The quadratic surface is fitted once using the configured training split. For each calibration count, the script includes one centred/maximin subset and draws the remaining unique subsets from training cases only. All subsets use the same untouched held-out geometries. Outputs include per-subset metrics, summary statistics, metadata, and a plot of error and stiffness-scale sensitivity. The default 30 repetitions means 30 subsets per count, including the centred/maximin selection.
+
 ### Outputs and checks
 
 The sweep CSV includes design variables, actual thickness, $D_{\mathrm{eff}}$, $S_{\mathrm{eff}}$, tip deflection, compliance, and mass. Fitting writes `metrics.json`, `test_predictions.csv`, `quadratic_model.joblib`, and a LaTeX results table. Plot held-out predictions with:
@@ -76,4 +92,4 @@ The earlier compliance-multiplier fit is preserved in [`results/quadratic_run_20
 
 ## Repository contents
 
-`layup.json` defines the 20-ply material sequence and input properties. `src/` contains the PyMAPDL sweep, laminate section setup, analytical reference, quadratic fit, plotting, and mass optimization tools. `latex/` contains report material; `docs/requirements_traceability.md` tracks the brief. The archived `results/laminate_run_2026-10-17/` folder contains the earlier 100 N exploratory run and is superseded by the 10 N sweep configuration for the current workflow. The archived data are not the output of the new configuration.
+`layup.json` defines the 20-ply material sequence and input properties. `src/` contains the PyMAPDL sweep, laminate section setup, analytical reference, quadratic fit, calibration sensitivity analysis, plotting, and mass optimization tools. `latex/` contains report material; `docs/requirements_traceability.md` tracks the brief. Archived results distinguish the original 100 N exploratory run, the preliminary one-point compliance correction, the direct-stiffness calibration, and the calibration-observation sensitivity analysis.

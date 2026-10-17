@@ -71,3 +71,26 @@ def test_least_squares_recovers_shared_effective_stiffness_scale():
         InverseStiffnessResponse(), x_cal, target, 1.0, (0.8, 1.2))
     assert abs(fitted - truth_scale) < 1e-6
     assert sse < 1e-15
+
+
+def test_sensitivity_subsets_are_unique_and_training_only():
+    import numpy as np
+    import pandas as pd
+    from analyze_calibration_sensitivity import make_calibration_subsets
+
+    data = pd.DataFrame({
+        "length_m": np.linspace(0.4, 0.6, 12),
+        "root_width_m": np.linspace(0.04, 0.06, 12),
+        "taper_ratio": np.linspace(0.4, 0.9, 12),
+    })
+    train_idx = np.array([0, 1, 2, 3, 4, 5, 6, 7])
+    subsets = make_calibration_subsets(data, train_idx, 3, 5, 123)
+    repeated = make_calibration_subsets(data, train_idx, 3, 5, 123)
+
+    assert len(subsets) == 5
+    chosen = [tuple(sorted(indices.tolist())) for _, indices in subsets]
+    assert len(set(chosen)) == len(chosen)
+    assert all(len(indices) == 3 for _, indices in subsets)
+    assert all(set(indices).issubset(set(train_idx)) for _, indices in subsets)
+    assert subsets[0][0] == "centred_maximin"
+    assert all(np.array_equal(a[1], b[1]) for a, b in zip(subsets, repeated))

@@ -14,7 +14,7 @@
 \maketitle
 
 \begin{abstract}
-This project develops a reproducible workflow for learning a structural response model from finite-element analysis (FEA), calibrating an effective section stiffness from a small number of known reference observations, and checking predictions on held-out geometries. The method is first exercised on a straight, linearly width-tapered cantilever with an analytical small-deflection reference before application to a curved composite leaf-spring landing gear. The current PyAnsys input specifies a 120-case, 10 N static laminate sweep over geometry, thickness, and effective stiffness. A full quadratic response surface models FEA compliance; bounded least squares estimates the effective stiffness scale directly from analytical observations. Held-out cases test transfer to unseen geometries at the same thickness and fitted stiffness. A 120-case, 10 N PyMAPDL SHELL181 sweep and quadratic fit have been evaluated with the revised direct effective-stiffness calibration. A single analytical observation produced a fitted shared stiffness scale of 0.9761. On 24 held-out geometries, MAPE decreased from 5.323\% to 5.128\%, while RMSE and MAE increased. The outcome is therefore mixed and remains preliminary. Earlier one-point compliance-multiplier and 100 N results are preserved separately for comparison.
+This project develops a reproducible workflow for learning a structural response model from finite-element analysis (FEA), calibrating an effective section stiffness from a small number of known reference observations, and checking predictions on held-out geometries. The method is first exercised on a straight, linearly width-tapered cantilever with an analytical small-deflection reference before application to a curved composite leaf-spring landing gear. The current PyAnsys input specifies a 120-case, 10 N static laminate sweep over geometry, thickness, and effective stiffness. A full quadratic response surface models FEA compliance; bounded least squares estimates the effective stiffness scale directly from analytical observations. Held-out cases test transfer to unseen geometries at the same thickness and fitted stiffness. A 120-case, 10 N PyMAPDL SHELL181 sweep and quadratic fit have been evaluated with the revised direct effective-stiffness calibration. A single analytical observation produced a fitted shared stiffness scale of 0.9761. On 24 held-out geometries, MAPE decreased from 5.323\% to 5.128\%, while RMSE and MAE increased. A repeated-subset sensitivity analysis found that mean held-out MAPE remained worse than the nominal model for all tested calibration counts. The outcome is therefore mixed and remains preliminary. Earlier one-point compliance-multiplier and 100 N results are preserved separately for comparison.
 \end{abstract}
 
 \section{Problem definition and scope}
@@ -71,7 +71,7 @@ The model inputs are $(L,b_0,r_b,h,s_E)$ and the output is $C$. A fixed random s
 The fitted scale multiplies all elastic and shear moduli, so bending and transverse shear stiffness change together. One calibration configuration is the mathematical minimum for one scalar; the default selects training geometries near the centre of the geometry domain. The held-out geometries are predicted at the same $h_c$ and $\widehat{s}_E$ and compared with the analytical equation evaluated at the reference scale $s_{E,true}$. This isolates geometry transfer in the analytical comparison. A larger calibration set can estimate the same scalar more robustly. The nominal and reference scales are set in the input configuration; both equal 1.0 for this benchmark.
 
 \section{Results and validation}
-The revised direct-stiffness fit and its outputs are archived in \texttt{results/quadratic\_run\_2026-10-17\_direct\_stiffness\_calibration/}. The 120-case dataset was divided into 96 training cases and 24 held-out cases. One analytical calibration observation (case 109) was used to estimate the shared effective stiffness scale, yielding $\widehat{s}_E=0.97609$ relative to the reference scale of 1.0. The held-out geometry test keeps thickness at its nominal scale and compares against the analytical model at the reference stiffness.
+The revised direct-stiffness fit and its outputs are archived in \path{results/quadratic_run_2026-10-17_direct_stiffness_calibration/}. The 120-case dataset was divided into 96 training cases and 24 held-out cases. One analytical calibration observation (case 109) was used to estimate the shared effective stiffness scale, yielding $\widehat{s}_E=0.97609$ relative to the reference scale of 1.0. The held-out geometry test keeps thickness at its nominal scale and compares against the analytical model at the reference stiffness.
 
 \begin{table}[H]
 \centering
@@ -89,6 +89,37 @@ Calibrated stiffness vs. analytical & $3.040\times10^{-4}$ & $2.518\times10^{-4}
 \end{table}
 
 The calibration gives a mixed outcome. It reduces MAPE by 0.195 percentage points and reduces maximum absolute percentage error from 15.36\% to 12.17\%, but RMSE rises by 13.9\%, MAE rises by 12.1\%, and $R^2$ falls from 0.9777 to 0.9710. This shows that the fitted scalar improves the percentage-error measures for this held-out split, while worsening absolute-error measures. It does not establish a general improvement. One observation is the mathematical minimum for one fitted scalar; repeat the assessment with multiple calibration observations and alternative held-out splits to test robustness.
+
+\subsection{Sensitivity to the number and selection of observations}
+To test whether the result depends on calibration-case selection, the quadratic model and 24-case held-out geometry set were held fixed. For each calibration count (1, 2, 3, or 5), 30 unique calibration subsets were evaluated: one centred/maximin subset and 29 random subsets sampled from the training cases. Analytical references for held-out cases were used only for scoring.
+
+\begin{table}[H]
+\centering
+\small
+\caption{Calibration-subset sensitivity on one fixed train/test split. Positive error changes mean worse performance than the nominal model.}
+\label{tab:calibration-sensitivity}
+\begin{tabular}{rrrrr}
+\toprule
+Observations & Mean fitted $s_E$ (SD) & Mean $\Delta$MAPE (pp) & Median $\Delta$MAPE (pp) & MAPE improved \\
+\midrule
+1 & 0.9818 (0.0462) & +1.521 & +0.919 & 30.0\% \\
+2 & 0.9978 (0.0307) & +0.830 & +0.579 & 33.3\% \\
+3 & 1.0030 (0.0289) & +0.895 & +0.692 & 30.0\% \\
+5 & 1.0055 (0.0164) & +0.535 & +0.314 & 36.7\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The nominal held-out MAPE was 5.323\%. Across these subsets, both mean and median MAPE change were positive at every calibration count, and only 30.0--36.7\% of subsets improved MAPE. Mean RMSE increased by 53.0\%, 22.8\%, 20.5\%, and 8.4\% for 1, 2, 3, and 5 observations respectively. Increasing the number of observations made the fitted stiffness scale less variable and brought its mean closer to the reference value, but that did not produce better predictions on average for this split. Calibration-case placement matters, and the centred one-point result is not representative of most tested subsets.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\linewidth]{../results/calibration_sensitivity_2026-10-17/calibration_sensitivity.png}
+\caption{Held-out error changes and fitted stiffness scales across 30 calibration subsets per observation count. Dashed lines mark no error change and the reference stiffness scale.}
+\label{fig:calibration-sensitivity}
+\end{figure}
+
+The sensitivity analysis conditions on one fitted response surface and one train/test split. It tests calibration-subset sensitivity, not variation across different FEA designs or physical observations. Repeat with alternative fixed split seeds before making a broader claim.
 
 The sweep's $|\delta|/L$ ratio ranges from approximately 0.034 to 0.330. Cases near the upper end may violate the small-deflection assumption of the analytical benchmark. The comparison tests interpolation within the sampled parameter region under stated assumptions. It does not establish extrapolation capacity or validate physical material properties. No physical test data are included, and no physical validation claim is made.
 

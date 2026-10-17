@@ -42,9 +42,9 @@ python src/fit_corrected_surrogate.py `
   --output-dir results/quadratic_model
 ```
 
-The model fits a full quadratic response surface to FEA compliance $C=|\delta|/P$. One scalar effective stiffness factor is calibrated by least squares against the analytical tapered-beam compliance. One calibration configuration is the mathematical minimum for one scalar parameter; the default selects the training case nearest the design-space centre. The 20% test set is excluded from both the surface fit and calibration, and measures how well that one-point correction transfers. Set `model.calibration_points` to a larger value to fit the same scalar factor over multiple reference configurations.
+The model fits a full quadratic response surface to FEA compliance $C=|\delta|/P$. Calibration directly estimates one effective stiffness scale by bounded least squares against analytical observations. The default uses one calibration geometry, the mathematical minimum for one scalar parameter, and holds thickness at its nominal scale. The 20% test set is excluded from fitting and calibration. It tests predictions at unseen geometries while keeping thickness and effective stiffness fixed, which specifically tests geometry transfer. Set `model.calibration_points` higher to fit the same scalar using multiple analytical observations.
 
-The scalar correction assumes bending and transverse shear stiffness are biased by the same factor. In the script, $C_{\text{corrected}}=\beta C_{\text{quadratic}}$ and the equivalent effective stiffness factor is $1/\beta$. This is a deliberately simple calibration demonstration; it does not identify separate bending and shear corrections.
+The fitted scale multiplies all ply elastic and shear moduli, so the corresponding laminate bending stiffness $D_{\mathrm{eff}}$ and transverse shear stiffness $S_{\mathrm{eff}}$ change together. This single-parameter model does not identify separate bending and shear stiffness corrections. The config sets the initial scale and the scale used to generate the analytical reference; both are 1.0 for the nominal benchmark. For future physical calibration, the reference scale is replaced by measured responses, not treated as a known physical value.
 
 ### Outputs and checks
 

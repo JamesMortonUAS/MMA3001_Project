@@ -9,7 +9,7 @@
 <tr class="heading-text decor">
 <td class="title">&nbsp;<br><strong class="title">analytic</strong></td>
 <td class="extra"><a href=".">index</a><br><a href="../../src/analytic.py">../../src/analytic.py</a></td></tr></table>
-    <p><span class="code">Analytical&nbsp;Euler-Bernoulli&nbsp;+&nbsp;Timoshenko&nbsp;compliance&nbsp;for&nbsp;width&nbsp;taper.</span></p>
+    <p><span class="code">Analytical&nbsp;small-deflection&nbsp;response&nbsp;for&nbsp;a&nbsp;linearly&nbsp;width-tapered&nbsp;beam.</span></p>
 <p>
 <table class="section">
 <tr class="decor pkg-content-decor heading-text">
@@ -23,16 +23,10 @@
 <td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
     
 <tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
-<td class="singlecolumn"><dl><dt><a name="-beam_mass_kg"><strong>beam_mass_kg</strong></a>(length_m: 'float', root_width_m: 'float', taper_ratio: 'float', thickness_m: 'float', density_kg_m3: 'float') -&gt; 'float'</dt><dd><span class="code">Mass&nbsp;for&nbsp;constant-thickness,&nbsp;uniform-density&nbsp;linearly&nbsp;tapered&nbsp;beam.</span></dd></dl>
- <dl><dt><a name="-tip_compliance"><strong>tip_compliance</strong></a>(length_m: 'float', root_width_m: 'float', taper_ratio: 'float', thickness_m: 'float', youngs_modulus_pa: 'float', poissons_ratio: 'float', shear_correction: 'float' = 0.8333333333333334, quadrature_order: 'int' = 64) -&gt; 'float'</dt><dd><span class="code">Return&nbsp;tip&nbsp;compliance&nbsp;|delta/P|&nbsp;[m/N]&nbsp;for&nbsp;a&nbsp;rectangular&nbsp;cantilever.<br>
-&nbsp;<br>
-Assumes&nbsp;a&nbsp;clamped&nbsp;root,&nbsp;free&nbsp;tip,&nbsp;transverse&nbsp;tip&nbsp;point&nbsp;force,&nbsp;constant<br>
-thickness&nbsp;and&nbsp;isotropic&nbsp;linear-elastic&nbsp;material.&nbsp;The&nbsp;width&nbsp;varies&nbsp;linearly<br>
-from&nbsp;``root_width_m``&nbsp;to&nbsp;``taper_ratio&nbsp;*&nbsp;root_width_m``.</span></dd></dl>
- <dl><dt><a name="-tip_compliance_from_stiffness"><strong>tip_compliance_from_stiffness</strong></a>(length_m: 'float', root_width_m: 'float', taper_ratio: 'float', d_eff_Nm: 'float', s_eff_N_per_m: 'float', shear_correction: 'float' = 0.8333333333333334, quadrature_order: 'int' = 64) -&gt; 'float'</dt><dd><span class="code">Return&nbsp;compliance&nbsp;from&nbsp;laminate&nbsp;stiffnesses&nbsp;per&nbsp;unit&nbsp;width.<br>
+<td class="singlecolumn"><dl><dt><a name="-tip_compliance_from_stiffness"><strong>tip_compliance_from_stiffness</strong></a>(length_m: 'float', root_width_m: 'float', taper_ratio: 'float', d_eff_Nm: 'float', s_eff_N_per_m: 'float', shear_correction: 'float' = 0.8333333333333334, quadrature_order: 'int' = 64) -&gt; 'float'</dt><dd><span class="code">Return&nbsp;tip&nbsp;compliance&nbsp;from&nbsp;laminate&nbsp;bending/shear&nbsp;stiffnesses.<br>
 &nbsp;<br>
 ``d_eff_Nm``&nbsp;is&nbsp;bending&nbsp;stiffness&nbsp;per&nbsp;unit&nbsp;width&nbsp;(N&nbsp;m);&nbsp;``s_eff_N_per_m``<br>
-is&nbsp;transverse&nbsp;shear&nbsp;stiffness&nbsp;per&nbsp;unit&nbsp;width&nbsp;(N/m).&nbsp;This&nbsp;form&nbsp;can&nbsp;accept<br>
-laminate-equivalent&nbsp;stiffnesses&nbsp;when&nbsp;those&nbsp;have&nbsp;been&nbsp;independently&nbsp;derived.</span></dd></dl>
+is&nbsp;transverse&nbsp;shear&nbsp;stiffness&nbsp;per&nbsp;unit&nbsp;width&nbsp;(N/m).&nbsp;Assumes&nbsp;a&nbsp;clamped&nbsp;root,<br>
+a&nbsp;free&nbsp;tip,&nbsp;a&nbsp;transverse&nbsp;tip&nbsp;point&nbsp;load,&nbsp;and&nbsp;small-deflection&nbsp;response.</span></dd></dl>
 </td></tr></table>
 </body></html>

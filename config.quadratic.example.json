@@ -1,0 +1,28 @@
+{
+  "units": "SI",
+  "baseline": {
+    "length_m": 0.5,
+    "root_width_m": 0.05,
+    "taper_ratio": 0.6,
+    "tip_load_N": 10.0
+  },
+  "sweep": {
+    "length_scale": [0.8, 1.2],
+    "root_width_scale": [0.8, 1.2],
+    "taper_ratio": [0.4, 0.9],
+    "thickness_scale": [0.75, 1.25],
+    "effective_stiffness_scale": [0.8, 1.2],
+    "n_design_points": 120,
+    "seed": 20261017
+  },
+  "fea": {
+    "analysis_type": "static linear",
+    "nproc": 2,
+    "shear_correction_factor_analytic": 0.8333333333333334
+  },
+  "model": {
+    "test_fraction": 0.2,
+    "calibration_points": 1,
+    "seed": 1234
+  }
+}

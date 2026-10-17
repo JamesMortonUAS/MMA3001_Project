@@ -9,7 +9,7 @@
 <tr class="heading-text decor">
 <td class="title">&nbsp;<br><strong class="title">fit_corrected_surrogate</strong></td>
 <td class="extra"><a href=".">index</a><br><a href="../../src/fit_corrected_surrogate.py">../../src/fit_corrected_surrogate.py</a></td></tr></table>
-    <p><span class="code">Fit&nbsp;FEA&nbsp;compliance&nbsp;model&nbsp;and&nbsp;sparse&nbsp;analytical&nbsp;discrepancy&nbsp;correction.</span></p>
+    <p><span class="code">Fit&nbsp;a&nbsp;quadratic&nbsp;FEA&nbsp;response&nbsp;surface&nbsp;and&nbsp;calibrate&nbsp;one&nbsp;stiffness&nbsp;factor.</span></p>
 <p>
 <table class="section">
 <tr class="decor pkg-content-decor heading-text">
@@ -27,16 +27,16 @@
 <td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
     
 <tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
-<td class="singlecolumn"><dl><dt><a name="-analytic_column"><strong>analytic_column</strong></a>(df: 'pd.DataFrame', config: 'dict', layup: 'dict | None' = None) -&gt; 'np.ndarray'</dt></dl>
- <dl><dt><a name="-gp_model"><strong>gp_model</strong></a>(seed: 'int') -&gt; 'GaussianProcessRegressor'</dt></dl>
+<td class="singlecolumn"><dl><dt><a name="-analytical_reference"><strong>analytical_reference</strong></a>(data: 'pd.DataFrame', config: 'dict') -&gt; 'np.ndarray'</dt></dl>
  <dl><dt><a name="-main"><strong>main</strong></a>() -&gt; 'None'</dt></dl>
+ <dl><dt><a name="-quadratic_model"><strong>quadratic_model</strong></a>() -&gt; 'object'</dt><dd><span class="code">Full&nbsp;second-order&nbsp;polynomial&nbsp;surface&nbsp;with&nbsp;a&nbsp;numerically&nbsp;stable&nbsp;fit.</span></dd></dl>
  <dl><dt><a name="-score"><strong>score</strong></a>(y_true, y_pred) -&gt; 'dict'</dt></dl>
- <dl><dt><a name="-tex_escape"><strong>tex_escape</strong></a>(s: 'str') -&gt; 'str'</dt></dl>
+ <dl><dt><a name="-select_calibration_indices"><strong>select_calibration_indices</strong></a>(x: 'np.ndarray', train_idx: 'np.ndarray', n: 'int') -&gt; 'np.ndarray'</dt><dd><span class="code">Select&nbsp;training&nbsp;cases&nbsp;nearest&nbsp;the&nbsp;design-space&nbsp;centre,&nbsp;then&nbsp;spread&nbsp;out.</span></dd></dl>
 </td></tr></table><p>
 <table class="section">
 <tr class="decor data-decor heading-text">
 <td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
     
 <tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
-<td class="singlecolumn"><strong>FEATURES</strong> = ['length_m', 'root_width_m', 'taper_ratio']</td></tr></table>
+<td class="singlecolumn"><strong>FEATURES</strong> = ['length_m', 'root_width_m', 'taper_ratio', 'thickness_scale', 'effective_stiffness_scale']</td></tr></table>
 </body></html>

@@ -1,0 +1,76 @@
+{
+  "input_file": "results/quadratic_sweep.csv",
+  "data_origin": "PyMAPDL SHELL181 FEA",
+  "n_total": 120,
+  "n_train": 96,
+  "n_test": 24,
+  "n_analytical_calibration": 1,
+  "calibration_case_ids": [
+    109
+  ],
+  "geometry_transfer_test_case_ids": [
+    51,
+    54,
+    48,
+    87,
+    104,
+    86,
+    27,
+    107,
+    70,
+    98,
+    22,
+    8,
+    6,
+    32,
+    89,
+    103,
+    68,
+    29,
+    97,
+    114,
+    118,
+    55,
+    42,
+    1
+  ],
+  "features": [
+    "length_m",
+    "root_width_m",
+    "taper_ratio",
+    "thickness_scale",
+    "effective_stiffness_scale"
+  ],
+  "target": "tip compliance |delta|/P [m/N]",
+  "response_surface": "full quadratic polynomial (21 coefficients for five inputs)",
+  "calibration": {
+    "method": "bounded nonlinear least-squares fit of one effective stiffness scale",
+    "initial_effective_stiffness_scale": 1.0,
+    "calibrated_effective_stiffness_scale": 0.976092412801277,
+    "reference_effective_stiffness_scale": 1.0,
+    "calibration_thickness_scale": 1.0,
+    "cost_sum_squared_residuals": 1.1209568172528246e-14,
+    "relationship": "select s_E minimizing sum((C_analytical - C_quadratic(geometry, thickness, s_E))^2)"
+  },
+  "quadratic_vs_fea_test_at_sweep_inputs": {
+    "rmse_m_per_N": 0.00036241234428524295,
+    "mae_m_per_N": 0.000271248956755208,
+    "r2": 0.9875859173805412,
+    "mean_absolute_percentage_error_percent": 5.928639582357187,
+    "max_absolute_percentage_error_percent": 16.401054967695014
+  },
+  "nominal_quadratic_vs_analytical_geometry_test": {
+    "rmse_m_per_N": 0.0002667816101537354,
+    "mae_m_per_N": 0.00022463995220709182,
+    "r2": 0.9776870594058801,
+    "mean_absolute_percentage_error_percent": 5.322937113380982,
+    "max_absolute_percentage_error_percent": 15.359348388650156
+  },
+  "calibrated_quadratic_vs_analytical_geometry_test": {
+    "rmse_m_per_N": 0.00030400430598164684,
+    "mae_m_per_N": 0.0002517523433236652,
+    "r2": 0.9710262638717716,
+    "mean_absolute_percentage_error_percent": 5.128141803382501,
+    "max_absolute_percentage_error_percent": 12.168276150510543
+  }
+}

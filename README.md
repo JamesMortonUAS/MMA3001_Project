@@ -59,9 +59,11 @@ python src/plot_results.py `
 
 Run the solver-independent checks with `python -m pytest`. These checks do not launch MAPDL.
 
-## Archived preliminary 10 N run
+## Latest calibration results
 
-A 120-case 10 N SHELL181 sweep and one-point calibration output are preserved in [`results/quadratic_run_2026-10-17_one_point_calibration/`](results/quadratic_run_2026-10-17_one_point_calibration/). This was produced with the earlier compliance-multiplier fitter, before the revised direct effective-stiffness calibration. On 24 held-out cases, the raw model had 5.95% MAPE against the analytical reference; the one-point correction increased it to 7.27%. Treat this as a baseline only and rerun with the current scripts. The run's deflection-to-length ratio reached 0.330, so the highest-displacement cases may violate the benchmark's small-deflection assumption.
+The latest archived run is [`results/quadratic_run_2026-10-17_direct_stiffness_calibration/`](results/quadratic_run_2026-10-17_direct_stiffness_calibration/). It uses one analytical calibration observation to estimate a shared effective stiffness scale of 0.97609. On 24 held-out geometries, MAPE improved from 5.323% to 5.128%, while RMSE, MAE, and $R^2$ worsened. The calibration therefore has a mixed effect across metrics and requires robustness checks with additional calibration cases and alternate splits. The maximum deflection-to-length ratio was 0.330; the highest-displacement cases may violate the analytical small-deflection assumption.
+
+The earlier compliance-multiplier fit is preserved in [`results/quadratic_run_2026-10-17_one_point_calibration/`](results/quadratic_run_2026-10-17_one_point_calibration/) for comparison. That correction increased held-out MAPE from 5.95% to 7.27%.
 
 ## Assumptions and limits
 

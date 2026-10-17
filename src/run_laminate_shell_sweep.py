@@ -7,10 +7,31 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from scipy.stats import qmc
 
 from laminate_section import (define_twenty_ply_shell_section, layup_plies,
-                              laminate_thickness)
-from run_pymapdl_sweep import make_design
+                              scaled_layup, effective_bending_shear_stiffness)
+
+
+def make_design(config: dict) -> pd.DataFrame:
+    """Create a five-factor Latin-hypercube design for the laminate model."""
+    base, sweep = config["baseline"], config["sweep"]
+    n = int(sweep["n_design_points"])
+    if n < 42:
+        raise ValueError("Use at least 42 cases for a five-input quadratic surface")
+    unit = qmc.LatinHypercube(d=5, seed=int(sweep["seed"])).random(n)
+    ranges = [sweep[k] for k in ("length_scale", "root_width_scale", "taper_ratio",
+                                  "thickness_scale", "effective_stiffness_scale")]
+    values = [lo + unit[:, i] * (hi - lo) for i, (lo, hi) in enumerate(ranges)]
+    return pd.DataFrame({
+        "case_id": np.arange(n),
+        "length_m": base["length_m"] * values[0],
+        "root_width_m": base["root_width_m"] * values[1],
+        "taper_ratio": values[2],
+        "thickness_scale": values[3],
+        "effective_stiffness_scale": values[4],
+        "tip_load_N": float(base.get("tip_load_N", 10.0)),
+    })
 
 
 def _node_id(i: int, j: int, n_width: int) -> int:
@@ -22,8 +43,10 @@ def solve_case(mapdl, row, layup: dict, n_length: int, n_width: int,
     """Solve one structured-planform shell model; return tip UZ, mass, h_total."""
     mapdl.clear()
     mapdl.prep7()
+    case_layup = scaled_layup(
+        layup, float(row.thickness_scale), float(row.effective_stiffness_scale))
     total_thickness = define_twenty_ply_shell_section(
-        mapdl, layup["material_cards"], section_id=1,
+        mapdl, case_layup["material_cards"], section_id=1,
         integration_points_per_ply=integration_points)
 
     length = float(row.length_m)
@@ -69,10 +92,10 @@ def solve_case(mapdl, row, layup: dict, n_length: int, n_width: int,
     mapdl.finish()
 
     # Mass per panel area is summed from the cured-composite layer densities.
-    plies = layup_plies(layup)
+    plies = layup_plies(case_layup)
     areal_mass = sum(
-        float(layup["material_cards"][mat]["density_kg_m3"])
-        * float(layup["material_cards"][mat]["ply_thickness_m"])
+        float(case_layup["material_cards"][mat]["density_kg_m3"])
+        * float(case_layup["material_cards"][mat]["ply_thickness_m"])
         for mat, _angle in plies
     )
     planform_area = length * b0 * (1.0 + rb) / 2.0
@@ -93,14 +116,6 @@ def main() -> None:
     cfg = json.loads(Path(args.config).read_text())
     layup = json.loads(Path(args.layup).read_text())
     design = make_design(cfg)
-    ply_stack_thickness = laminate_thickness(layup)
-    config_thickness = float(cfg["baseline"].get("thickness_m", ply_stack_thickness))
-    if not np.isclose(config_thickness, ply_stack_thickness, rtol=0.0, atol=1e-12):
-        print(
-            "Note: baseline.thickness_m in the config is not used by the laminate "
-            f"shell model ({config_thickness:g} m). The layup defines the modeled "
-            f"thickness: {ply_stack_thickness:g} m ({1000 * ply_stack_thickness:g} mm)."
-        )
 
     from ansys.mapdl.core import launch_mapdl
     mapdl = launch_mapdl(nproc=int(cfg["fea"].get("nproc", 2)))
@@ -109,7 +124,11 @@ def main() -> None:
         for row in design.itertuples(index=False):
             uz, mass, thickness = solve_case(
                 mapdl, row, layup, args.nx, args.ny, args.integration_points)
+            case_layup = scaled_layup(
+                layup, float(row.thickness_scale), float(row.effective_stiffness_scale))
+            d_eff, s_eff = effective_bending_shear_stiffness(case_layup)
             results.append({**row._asdict(), "thickness_m": thickness,
+                            "D_eff_Nm": d_eff, "S_eff_N_per_m": s_eff,
                             "tip_deflection_m": uz,
                             "compliance_m_per_N": abs(uz) / float(row.tip_load_N),
                             "mass_kg": mass, "laminate_thickness_m": thickness,

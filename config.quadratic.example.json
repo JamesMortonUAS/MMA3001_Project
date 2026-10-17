@@ -23,6 +23,9 @@
   "model": {
     "test_fraction": 0.2,
     "calibration_points": 1,
+    "initial_effective_stiffness_scale": 1.0,
+    "reference_effective_stiffness_scale": 1.0,
+    "calibration_thickness_scale": 1.0,
     "seed": 1234
   }
 }

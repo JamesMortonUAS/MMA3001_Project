@@ -6,13 +6,14 @@ The pytest suite checks the 20-ply configuration, nominal 3.50 mm thickness,
 and positive effective bending and shear stiffness. The suite does not launch
 MAPDL and therefore does not verify solver setup or mesh convergence.
 
-**Local status:** 5 tests passed with `python -m pytest -q` after implementing
+**Local status:** 6 tests passed with `python -m pytest -q` after implementing
 the current quadratic workflow.
 
 The non-solver fitting workflow was also exercised with a generated 120-row
-smoke-test CSV. It completed the train/test split, quadratic fit, one-point
-least-squares calibration, and wrote metrics, predictions, model, and LaTeX
-table. The smoke-test values were synthetic and are not FEA or project results.
+smoke-test CSV. It completed the train/test split, quadratic fit, direct
+least-squares stiffness-scale calibration, and fixed-section geometry-transfer
+evaluation. It wrote metrics, predictions, model, and LaTeX table. The
+smoke-test values were synthetic and are not FEA or project results.
 
 ## Current FEA status
 

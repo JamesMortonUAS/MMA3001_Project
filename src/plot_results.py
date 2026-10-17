@@ -19,8 +19,8 @@ def main() -> None:
     pred = pd.read_csv(args.predictions)
     sweep_required = {"length_m", "root_width_m", "taper_ratio", "compliance_m_per_N",
                       "mass_kg", "tip_deflection_m", "case_id"}
-    pred_required = {"analytical_compliance_m_per_N", "gp_raw_compliance_m_per_N",
-                     "gp_corrected_compliance_m_per_N"}
+    pred_required = {"analytical_compliance_m_per_N", "quadratic_fea_compliance_m_per_N",
+                     "corrected_compliance_m_per_N"}
     if missing := sweep_required - set(sweep.columns):
         raise ValueError(f"Sweep CSV is missing columns: {sorted(missing)}")
     if missing := pred_required - set(pred.columns):
@@ -45,13 +45,13 @@ def main() -> None:
 
     ax = axes[1, 0]
     x = pred["analytical_compliance_m_per_N"]
-    y_raw = pred["gp_raw_compliance_m_per_N"]
-    y_corrected = pred["gp_corrected_compliance_m_per_N"]
+    y_raw = pred["quadratic_fea_compliance_m_per_N"]
+    y_corrected = pred["corrected_compliance_m_per_N"]
     low = min(x.min(), y_raw.min(), y_corrected.min())
     high = max(x.max(), y_raw.max(), y_corrected.max())
     ax.plot([low, high], [low, high], color="0.3", linestyle="--", label="Perfect agreement")
-    ax.scatter(x, y_raw, label="Raw GP", marker="o", s=42)
-    ax.scatter(x, y_corrected, label="Corrected GP", marker="x", s=48)
+    ax.scatter(x, y_raw, label="Raw quadratic", marker="o", s=42)
+    ax.scatter(x, y_corrected, label="Corrected quadratic", marker="x", s=48)
     ax.set(title="Held-out predictions vs analytical benchmark",
            xlabel="Analytical compliance (m/N)", ylabel="Predicted compliance (m/N)")
     ax.legend(frameon=False)

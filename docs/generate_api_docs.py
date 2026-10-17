@@ -9,15 +9,16 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT = Path(__file__).resolve().parent / "api"
 MODULES = (
-    "analytic", "fit_corrected_surrogate", "generate_reference",
-    "laminate_section", "optimize_mass", "plot_results",
-    "run_laminate_shell_sweep", "run_pymapdl_sweep",
+    "analytic", "fit_corrected_surrogate", "laminate_section",
+    "optimize_mass", "plot_results", "run_laminate_shell_sweep",
 )
 
 
 def main() -> None:
     """Write one pydoc HTML page for each documented project module."""
     OUTPUT.mkdir(parents=True, exist_ok=True)
+    for old_page in OUTPUT.glob("*.html"):
+        old_page.unlink()
     env = os.environ.copy()
     env["PYTHONPATH"] = str(ROOT / "src") + os.pathsep + env.get("PYTHONPATH", "")
     for module in MODULES:

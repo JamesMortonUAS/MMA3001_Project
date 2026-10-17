@@ -30,10 +30,11 @@ def main() -> None:
     layup = json.loads(Path(args.layup).read_text())
     model_data = joblib.load(args.model)
     model = model_data["quadratic_fea"]
-    beta = float(model_data["compliance_multiplier_beta"])
+    calibrated_stiffness_scale = float(
+        model_data["calibrated_effective_stiffness_scale"])
     base, sweep = cfg["baseline"], cfg["sweep"]
     length, load = float(base["length_m"]), float(base["tip_load_N"])
-    nominal_stiffness_scale = 1.0
+    nominal_stiffness_scale = calibrated_stiffness_scale
     bounds = [
         (float(sweep["root_width_scale"][0]) * float(base["root_width_m"]),
          float(sweep["root_width_scale"][1]) * float(base["root_width_m"])),
@@ -50,7 +51,7 @@ def main() -> None:
                           nominal_stiffness_scale]])
 
     def compliance(z):
-        return beta * float(model.predict(features(z))[0])
+        return float(model.predict(features(z))[0])
 
     def mass(z):
         b0, rb, thickness_scale = map(float, z)

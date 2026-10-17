@@ -6,6 +6,7 @@ areal mass alone is not enough to define a structural material card.
 from __future__ import annotations
 
 import math
+import copy
 import numpy as np
 
 
@@ -42,6 +43,24 @@ def laminate_thickness(layup: dict) -> float:
                for name, _angle in layup_plies(layup))
 
 
+def scaled_layup(layup: dict, thickness_scale: float = 1.0,
+                 stiffness_scale: float = 1.0) -> dict:
+    """Copy a layup with scaled cured-ply thickness and elastic stiffness.
+
+    Density is unchanged. ``stiffness_scale`` multiplies every elastic
+    modulus and shear modulus, leaving Poisson ratios and mass unchanged.
+    This is a controlled effective-property parameter for the benchmark.
+    """
+    if thickness_scale <= 0 or stiffness_scale <= 0:
+        raise ValueError("thickness and stiffness scales must be positive")
+    out = copy.deepcopy(layup)
+    for card in out["material_cards"].values():
+        card["ply_thickness_m"] = float(card["ply_thickness_m"]) * thickness_scale
+        for key in ("EX_Pa", "EY_Pa", "EZ_Pa", "GXY_Pa", "GYZ_Pa", "GXZ_Pa"):
+            card[key] = float(card[key]) * stiffness_scale
+    return out
+
+
 def define_twenty_ply_shell_section(mapdl, material_cards: dict,
                                     section_id: int = 1,
                                     integration_points_per_ply: int = 3) -> float:
@@ -73,8 +92,7 @@ def define_twenty_ply_shell_section(mapdl, material_cards: dict,
         for key in ("EX_Pa", "EY_Pa", "EZ_Pa", "GXY_Pa", "GYZ_Pa", "GXZ_Pa", "density_kg_m3"):
             if float(card[key]) <= 0:
                 raise ValueError(f"{name} {key} must be positive")
-        # Orthotropic Poisson ratios do not share the isotropic (-1, 0.5)
-        # bound; ensure finiteness here and let MAPDL check matrix stability.
+        # Ensure finite values here and let MAPDL check material stability.
         for key, label in ORTHOTROPIC_FIELDS.items():
             mapdl.mp(label, mat_id, float(card[key]))
 

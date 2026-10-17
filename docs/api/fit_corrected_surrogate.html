@@ -27,16 +27,22 @@
 <td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
     
 <tr><td class="decor functions-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
-<td class="singlecolumn"><dl><dt><a name="-analytical_reference"><strong>analytical_reference</strong></a>(data: 'pd.DataFrame', config: 'dict') -&gt; 'np.ndarray'</dt></dl>
+<td class="singlecolumn"><dl><dt><a name="-analytical_reference"><strong>analytical_reference</strong></a>(data: 'pd.DataFrame', config: 'dict', layup: 'dict', thickness_scale: 'float', stiffness_scale: 'float') -&gt; 'np.ndarray'</dt><dd><span class="code">Calculate&nbsp;reference&nbsp;compliance&nbsp;at&nbsp;a&nbsp;common&nbsp;section-property&nbsp;setting.</span></dd></dl>
+ <dl><dt><a name="-fit_effective_stiffness_scale"><strong>fit_effective_stiffness_scale</strong></a>(model, x_cal: 'np.ndarray', reference_compliance: 'np.ndarray', initial_scale: 'float', scale_bounds: 'tuple[float, float]') -&gt; 'tuple[float, float]'</dt><dd><span class="code">Fit&nbsp;the&nbsp;shared&nbsp;modulus&nbsp;scale&nbsp;by&nbsp;bounded&nbsp;least&nbsp;squares.<br>
+&nbsp;<br>
+``x_cal``&nbsp;contains&nbsp;calibration&nbsp;geometries&nbsp;and&nbsp;thicknesses;&nbsp;its&nbsp;effective<br>
+stiffness-scale&nbsp;column&nbsp;is&nbsp;replaced&nbsp;by&nbsp;the&nbsp;candidate&nbsp;scalar&nbsp;during&nbsp;fitting.<br>
+Returns&nbsp;the&nbsp;fitted&nbsp;scale&nbsp;and&nbsp;the&nbsp;sum&nbsp;of&nbsp;squared&nbsp;residuals.</span></dd></dl>
  <dl><dt><a name="-main"><strong>main</strong></a>() -&gt; 'None'</dt></dl>
  <dl><dt><a name="-quadratic_model"><strong>quadratic_model</strong></a>() -&gt; 'object'</dt><dd><span class="code">Full&nbsp;second-order&nbsp;polynomial&nbsp;surface&nbsp;with&nbsp;a&nbsp;numerically&nbsp;stable&nbsp;fit.</span></dd></dl>
  <dl><dt><a name="-score"><strong>score</strong></a>(y_true, y_pred) -&gt; 'dict'</dt></dl>
- <dl><dt><a name="-select_calibration_indices"><strong>select_calibration_indices</strong></a>(x: 'np.ndarray', train_idx: 'np.ndarray', n: 'int') -&gt; 'np.ndarray'</dt><dd><span class="code">Select&nbsp;training&nbsp;cases&nbsp;nearest&nbsp;the&nbsp;design-space&nbsp;centre,&nbsp;then&nbsp;spread&nbsp;out.</span></dd></dl>
+ <dl><dt><a name="-select_calibration_indices"><strong>select_calibration_indices</strong></a>(data: 'pd.DataFrame', train_idx: 'np.ndarray', n: 'int') -&gt; 'np.ndarray'</dt><dd><span class="code">Select&nbsp;training&nbsp;geometries&nbsp;near&nbsp;the&nbsp;centre,&nbsp;then&nbsp;spread&nbsp;them&nbsp;out.</span></dd></dl>
 </td></tr></table><p>
 <table class="section">
 <tr class="decor data-decor heading-text">
 <td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Data</strong></td></tr>
     
 <tr><td class="decor data-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
-<td class="singlecolumn"><strong>FEATURES</strong> = ['length_m', 'root_width_m', 'taper_ratio', 'thickness_scale', 'effective_stiffness_scale']</td></tr></table>
+<td class="singlecolumn"><strong>FEATURES</strong> = ['length_m', 'root_width_m', 'taper_ratio', 'thickness_scale', 'effective_stiffness_scale']<br>
+<strong>GEOMETRY_FEATURES</strong> = ['length_m', 'root_width_m', 'taper_ratio']</td></tr></table>
 </body></html>

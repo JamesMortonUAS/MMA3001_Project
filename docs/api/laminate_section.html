@@ -19,9 +19,10 @@ areal&nbsp;mass&nbsp;alone&nbsp;is&nbsp;not&nbsp;enough&nbsp;to&nbsp;define&nbsp
 <td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Modules</strong></td></tr>
     
 <tr><td class="decor pkg-content-decor"><span class="code">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span></td><td>&nbsp;</td>
-<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="math.html">math</a><br>
+<td class="singlecolumn"><table><tr><td class="multicolumn"><a href="copy.html">copy</a><br>
+</td><td class="multicolumn"><a href="math.html">math</a><br>
 </td><td class="multicolumn"><a href="numpy.html">numpy</a><br>
-</td><td class="multicolumn"></td><td class="multicolumn"></td></tr></table></td></tr></table><p>
+</td><td class="multicolumn"></td></tr></table></td></tr></table><p>
 <table class="section">
 <tr class="decor functions-decor heading-text">
 <td class="section-title" colspan=3>&nbsp;<br><strong class="bigsection">Functions</strong></td></tr>
@@ -43,6 +44,11 @@ so&nbsp;extension-bending&nbsp;coupling&nbsp;in&nbsp;the&nbsp;unsymmetric&nbsp;s
 S_eff&nbsp;is&nbsp;the&nbsp;through-thickness&nbsp;sum&nbsp;of&nbsp;G13*t&nbsp;for&nbsp;the&nbsp;beam's&nbsp;x-z&nbsp;shear.</span></dd></dl>
  <dl><dt><a name="-laminate_thickness"><strong>laminate_thickness</strong></a>(layup: 'dict') -&gt; 'float'</dt><dd><span class="code">Sum&nbsp;cured&nbsp;ply&nbsp;thicknesses&nbsp;from&nbsp;the&nbsp;layup&nbsp;definition,&nbsp;in&nbsp;metres.</span></dd></dl>
  <dl><dt><a name="-layup_plies"><strong>layup_plies</strong></a>(layup: 'dict') -&gt; 'list[tuple[str, float]]'</dt><dd><span class="code">Normalize&nbsp;project&nbsp;JSON&nbsp;ply&nbsp;records&nbsp;to&nbsp;(material,&nbsp;angle)&nbsp;tuples.</span></dd></dl>
+ <dl><dt><a name="-scaled_layup"><strong>scaled_layup</strong></a>(layup: 'dict', thickness_scale: 'float' = 1.0, stiffness_scale: 'float' = 1.0) -&gt; 'dict'</dt><dd><span class="code">Copy&nbsp;a&nbsp;layup&nbsp;with&nbsp;scaled&nbsp;cured-ply&nbsp;thickness&nbsp;and&nbsp;elastic&nbsp;stiffness.<br>
+&nbsp;<br>
+Density&nbsp;is&nbsp;unchanged.&nbsp;``stiffness_scale``&nbsp;multiplies&nbsp;every&nbsp;elastic<br>
+modulus&nbsp;and&nbsp;shear&nbsp;modulus,&nbsp;leaving&nbsp;Poisson&nbsp;ratios&nbsp;and&nbsp;mass&nbsp;unchanged.<br>
+This&nbsp;is&nbsp;a&nbsp;controlled&nbsp;effective-property&nbsp;parameter&nbsp;for&nbsp;the&nbsp;benchmark.</span></dd></dl>
 </td></tr></table><p>
 <table class="section">
 <tr class="decor data-decor heading-text">

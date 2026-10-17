@@ -5,7 +5,8 @@ import sys
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from laminate_section import effective_bending_shear_stiffness, laminate_thickness, layup_plies
+from laminate_section import (effective_bending_shear_stiffness, laminate_thickness,
+                              layup_plies, scaled_layup)
 
 
 def load_layup():
@@ -28,3 +29,23 @@ def test_laminate_effective_stiffness_is_positive():
     d_eff, s_eff = effective_bending_shear_stiffness(load_layup())
     assert d_eff > 0
     assert s_eff > 0
+
+
+def test_thickness_and_effective_stiffness_scales_update_section_properties():
+    baseline = load_layup()
+    changed = scaled_layup(baseline, thickness_scale=1.2, stiffness_scale=0.9)
+    d0, s0 = effective_bending_shear_stiffness(baseline)
+    d1, s1 = effective_bending_shear_stiffness(changed)
+    assert abs(laminate_thickness(changed) / laminate_thickness(baseline) - 1.2) < 1e-12
+    assert d1 > 0 and s1 > 0
+    assert d1 != d0 and s1 != s0
+
+
+def test_new_design_contains_thickness_and_effective_stiffness_sweep():
+    from run_laminate_shell_sweep import make_design
+
+    cfg = json.loads((ROOT / "config.quadratic.example.json").read_text())
+    design = make_design(cfg)
+    assert len(design) == 120
+    assert set(("thickness_scale", "effective_stiffness_scale")) <= set(design.columns)
+    assert design["tip_load_N"].eq(10.0).all()

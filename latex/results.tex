@@ -1,0 +1,18 @@
+% Results fragment for inclusion in a larger report.
+% The full project report is project_report.tex.
+\subsection{Preliminary benchmark results}
+
+The archived 50-case sweep used 100 N linear static loading, a fixed 20-ply
+3.50 mm laminate, and a 40 by 6 SHELL181 mesh. The surrogate split comprised
+37 training and 13 held-out cases; five analytical reference observations were
+selected from training data only. The quadratic baseline gave 0.977\% MAPE
+against held-out FEA responses. The raw Gaussian process gave 0.139\% MAPE
+against the analytical reference, and sparse discrepancy correction gave
+0.150\%. Thus correction did not improve MAPE in this run.
+
+\input{../results/laminate_run_2026-10-17/model/results_table.tex}
+
+These are preliminary interpolation results for the idealized benchmark. The
+normalized absolute deflection ranges from 0.54 to 1.77, outside the
+small-deflection assumptions. Mesh convergence and solver-version metadata are
+not available in the archive. They are not evidence of physical validation.

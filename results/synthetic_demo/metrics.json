@@ -1,0 +1,42 @@
+{
+  "input_file": "results/synthetic_proxy.csv",
+  "data_origin": "synthetic four-cell midpoint proxy; NOT FEA",
+  "n_total": 50,
+  "n_train": 37,
+  "n_test": 13,
+  "n_analytical_calibration": 5,
+  "features": [
+    "length_m",
+    "root_width_m",
+    "taper_ratio"
+  ],
+  "target": "tip compliance |delta|/P [m/N]",
+  "raw_gp_vs_source_test": {
+    "rmse_m_per_N": 6.036819674570184e-07,
+    "mae_m_per_N": 2.8570692196494855e-07,
+    "r2": 0.9999097957039353,
+    "mean_absolute_percentage_error_percent": 0.14833852886580523,
+    "max_absolute_percentage_error_percent": 0.6383313449391032
+  },
+  "quadratic_vs_source_test": {
+    "rmse_m_per_N": 2.654032914685115e-06,
+    "mae_m_per_N": 1.7021854023651224e-06,
+    "r2": 0.9982564940880262,
+    "mean_absolute_percentage_error_percent": 0.9799871654955401,
+    "max_absolute_percentage_error_percent": 2.618543959851912
+  },
+  "raw_gp_vs_analytical_test": {
+    "rmse_m_per_N": 2.255720525578442e-06,
+    "mae_m_per_N": 1.9527919015299795e-06,
+    "r2": 0.998765018256666,
+    "mean_absolute_percentage_error_percent": 1.134865906109118,
+    "max_absolute_percentage_error_percent": 1.5308230961670524
+  },
+  "corrected_gp_vs_analytical_test": {
+    "rmse_m_per_N": 5.656391629154962e-07,
+    "mae_m_per_N": 3.2912839290546644e-07,
+    "r2": 0.9999223450943175,
+    "mean_absolute_percentage_error_percent": 0.18441070357753356,
+    "max_absolute_percentage_error_percent": 0.5368597985592847
+  }
+}

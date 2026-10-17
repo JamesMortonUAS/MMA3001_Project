@@ -1,0 +1,191 @@
+{
+  "description": "20-ply alternating composite beam layup; ordered from bottom surface to top surface.",
+  "orientation_reference": "0 degrees is aligned with the beam longitudinal axis; for the carbon 2x2 twill, the warp direction is aligned with the beam axis.",
+  "stacking_direction": "bottom_to_top",
+  "plies": [
+    {
+      "ply": 1,
+      "material": "CF_TWILL_200GSM",
+      "orientation_deg": 0,
+      "fiber_areal_mass_kg_m2": 0.2
+    },
+    {
+      "ply": 2,
+      "material": "GF_100GSM",
+      "orientation_deg": 0,
+      "fiber_areal_mass_kg_m2": 0.1
+    },
+    {
+      "ply": 3,
+      "material": "CF_TWILL_200GSM",
+      "orientation_deg": 0,
+      "fiber_areal_mass_kg_m2": 0.2
+    },
+    {
+      "ply": 4,
+      "material": "GF_100GSM",
+      "orientation_deg": 0,
+      "fiber_areal_mass_kg_m2": 0.1
+    },
+    {
+      "ply": 5,
+      "material": "CF_TWILL_200GSM",
+      "orientation_deg": 0,
+      "fiber_areal_mass_kg_m2": 0.2
+    },
+    {
+      "ply": 6,
+      "material": "GF_100GSM",
+      "orientation_deg": 0,
+      "fiber_areal_mass_kg_m2": 0.1
+    },
+    {
+      "ply": 7,
+      "material": "CF_TWILL_200GSM",
+      "orientation_deg": 0,
+      "fiber_areal_mass_kg_m2": 0.2
+    },
+    {
+      "ply": 8,
+      "material": "GF_100GSM",
+      "orientation_deg": 0,
+      "fiber_areal_mass_kg_m2": 0.1
+    },
+    {
+      "ply": 9,
+      "material": "CF_TWILL_200GSM",
+      "orientation_deg": 0,
+      "fiber_areal_mass_kg_m2": 0.2
+    },
+    {
+      "ply": 10,
+      "material": "GF_100GSM",
+      "orientation_deg": 0,
+      "fiber_areal_mass_kg_m2": 0.1
+    },
+    {
+      "ply": 11,
+      "material": "CF_TWILL_200GSM",
+      "orientation_deg": 0,
+      "fiber_areal_mass_kg_m2": 0.2
+    },
+    {
+      "ply": 12,
+      "material": "GF_100GSM",
+      "orientation_deg": 0,
+      "fiber_areal_mass_kg_m2": 0.1
+    },
+    {
+      "ply": 13,
+      "material": "CF_TWILL_200GSM",
+      "orientation_deg": 0,
+      "fiber_areal_mass_kg_m2": 0.2
+    },
+    {
+      "ply": 14,
+      "material": "GF_100GSM",
+      "orientation_deg": 0,
+      "fiber_areal_mass_kg_m2": 0.1
+    },
+    {
+      "ply": 15,
+      "material": "CF_TWILL_200GSM",
+      "orientation_deg": 0,
+      "fiber_areal_mass_kg_m2": 0.2
+    },
+    {
+      "ply": 16,
+      "material": "GF_100GSM",
+      "orientation_deg": 0,
+      "fiber_areal_mass_kg_m2": 0.1
+    },
+    {
+      "ply": 17,
+      "material": "CF_TWILL_200GSM",
+      "orientation_deg": 0,
+      "fiber_areal_mass_kg_m2": 0.2
+    },
+    {
+      "ply": 18,
+      "material": "GF_100GSM",
+      "orientation_deg": 0,
+      "fiber_areal_mass_kg_m2": 0.1
+    },
+    {
+      "ply": 19,
+      "material": "CF_TWILL_200GSM",
+      "orientation_deg": 0,
+      "fiber_areal_mass_kg_m2": 0.2
+    },
+    {
+      "ply": 20,
+      "material": "GF_100GSM",
+      "orientation_deg": 0,
+      "fiber_areal_mass_kg_m2": 0.1
+    }
+  ],
+  "counts": {
+    "CF_TWILL_200GSM": 10,
+    "GF_100GSM": 10
+  },
+  "total_dry_fiber_areal_mass_kg_m2": 3.0,
+  "required_before_laminate_fea": [],
+  "notes": [
+    "The specified cured thicknesses are interpreted as 0.20 mm for carbon and 0.15 mm for glass.",
+    "The supplied elastic constants are representative numerical inputs, not measured properties of the user\u2019s materials.",
+    "The 100 gsm glass is assumed to be unidirectional E-glass/epoxy because a 0 degree orientation was specified.",
+    "Carbon cured density assumes 42 percent resin by mass; glass assumes 40 percent resin by mass. These assumptions affect mass predictions.",
+    "The alternating CF/GF sequence is unsymmetric through the thickness and can produce extension-bending coupling.",
+    "All plies use 0 degree about the beam axis; for twill, the warp direction is aligned with the beam axis."
+  ],
+  "material_cards": {
+    "CF_TWILL_200GSM": {
+      "ply_thickness_m": 0.0002,
+      "EX_Pa": 60600000000.0,
+      "EY_Pa": 61600000000.0,
+      "EZ_Pa": 8300000000.0,
+      "PRXY": 0.1,
+      "PRYZ": 0.25,
+      "PRXZ": 0.25,
+      "GXY_Pa": 5000000000.0,
+      "GYZ_Pa": 3000000000.0,
+      "GXZ_Pa": 3000000000.0,
+      "density_kg_m3": 1724.1379310344826,
+      "assumptions": "In-plane tensile moduli from a 2x2 twill carbon prepreg data sheet. GXY and Poisson ratio use representative fabric-composite values; transverse constants are placeholders."
+    },
+    "GF_100GSM": {
+      "ply_thickness_m": 0.00015,
+      "EX_Pa": 38600000000.0,
+      "EY_Pa": 8270000000.0,
+      "EZ_Pa": 8270000000.0,
+      "PRXY": 0.26,
+      "PRYZ": 0.3,
+      "PRXZ": 0.26,
+      "GXY_Pa": 4140000000.0,
+      "GYZ_Pa": 3180769230.769231,
+      "GXZ_Pa": 4140000000.0,
+      "density_kg_m3": 1111.1111111111113,
+      "assumptions": "Assumed unidirectional E-glass/epoxy. In-plane values are representative published lamina constants; transverse symmetry and 40 percent resin mass fraction are assumptions."
+    }
+  },
+  "sources": [
+    {
+      "material": "CF_TWILL_200GSM",
+      "source": "Gurit SE84LV prepreg datasheet, Revchem-hosted copy",
+      "url": "https://www.revchem.com/document/15pc135966a_tds-pdf/",
+      "used_for": "2x2 twill carbon laminate 0-degree/90-degree modulus (60.6/61.6 GPa) and 42% resin content; the source reports a different exact ply thickness, overridden by the user\u2019s 0.20 mm input."
+    },
+    {
+      "material": "GF_100GSM",
+      "source": "Representative UD glass/epoxy lamina constants (E1=38.6 GPa, E2=8.27 GPa, nu12=0.26, G12=4.14 GPa)",
+      "url": "https://teaching.eng.cam.ac.uk/system/files/P2B2010QC002.pdf",
+      "used_for": "In-plane elastic constants only; assumes UD E-glass/epoxy."
+    },
+    {
+      "material": "CF_TWILL_200GSM",
+      "source": "Generic carbon fabric/epoxy elastic constants reference",
+      "url": "https://performance-composites.com/carbonfibre/mechanicalproperties_2.asp",
+      "used_for": "Representative G12=5 GPa and nu12=0.10 where the selected twill datasheet did not report them."
+    }
+  ]
+}

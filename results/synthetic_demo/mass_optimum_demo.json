@@ -1,0 +1,13 @@
+{
+  "status": "success",
+  "warning": "Only valid within the trained benchmark domain and model assumptions.",
+  "length_m_fixed": 0.5,
+  "root_width_m": 0.04304932577951719,
+  "tip_width_m": 0.017219730311806878,
+  "taper_ratio": 0.4,
+  "predicted_deflection_m_corrected_model": 0.020000000000120075,
+  "predicted_deflection_m_analytical_check": 0.01996621222026202,
+  "maximum_allowed_deflection_m": 0.02,
+  "mass_kg": 0.24107622436529627,
+  "optimizer_message": "Optimization terminated successfully"
+}

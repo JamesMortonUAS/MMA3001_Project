@@ -1,0 +1,43 @@
+{
+  "input_file": "results/laminate_sweep.csv",
+  "data_origin": "PyMAPDL FEA (assumed)",
+  "n_total": 50,
+  "n_train": 37,
+  "n_test": 13,
+  "n_analytical_calibration": 5,
+  "features": [
+    "length_m",
+    "root_width_m",
+    "taper_ratio"
+  ],
+  "target": "tip compliance |delta|/P [m/N]",
+  "analytical_reference": "laminate CLT A/B/D + x-z shear stiffness",
+  "raw_gp_vs_source_test": {
+    "rmse_m_per_N": 1.9076535450185582e-05,
+    "mae_m_per_N": 9.085296041778521e-06,
+    "r2": 0.9999129946767873,
+    "mean_absolute_percentage_error_percent": 0.14727076940296022,
+    "max_absolute_percentage_error_percent": 0.6259128748451224
+  },
+  "quadratic_vs_source_test": {
+    "rmse_m_per_N": 8.4597800972893e-05,
+    "mae_m_per_N": 5.454919164137624e-05,
+    "r2": 0.9982889410779134,
+    "mean_absolute_percentage_error_percent": 0.9771607893485665,
+    "max_absolute_percentage_error_percent": 2.587835014688951
+  },
+  "raw_gp_vs_analytical_test": {
+    "rmse_m_per_N": 1.960131253610166e-05,
+    "mae_m_per_N": 9.052046131876042e-06,
+    "r2": 0.9999082011341905,
+    "mean_absolute_percentage_error_percent": 0.1394665495199842,
+    "max_absolute_percentage_error_percent": 0.6511670278677485
+  },
+  "corrected_gp_vs_analytical_test": {
+    "rmse_m_per_N": 1.8907024172907132e-05,
+    "mae_m_per_N": 9.16672366095837e-06,
+    "r2": 0.9999145890863563,
+    "mean_absolute_percentage_error_percent": 0.14985707424171954,
+    "max_absolute_percentage_error_percent": 0.6180934522554846
+  }
+}

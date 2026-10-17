@@ -1,0 +1,30 @@
+{
+  "units": "SI",
+  "baseline": {
+    "length_m": 0.5,
+    "root_width_m": 0.05,
+    "thickness_m": 0.01,
+    "taper_ratio": 0.6,
+    "tip_load_N": 100.0,
+    "youngs_modulus_Pa": 70000000000.0,
+    "poissons_ratio": 0.3,
+    "density_kg_m3": 1600.0
+  },
+  "sweep": {
+    "length_scale": [0.8, 1.2],
+    "root_width_scale": [0.8, 1.2],
+    "taper_ratio": [0.4, 0.9],
+    "n_design_points": 50,
+    "seed": 2026
+  },
+  "fea": {
+    "elements": 40,
+    "nproc": 2,
+    "shear_correction_factor_analytic": 0.8333333333333334
+  },
+  "model": {
+    "test_fraction": 0.25,
+    "calibration_points": 5,
+    "seed": 1234
+  }
+}

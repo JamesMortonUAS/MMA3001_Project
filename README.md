@@ -25,6 +25,8 @@ tests/                        Lightweight checks of laminate setup and stiffness
 latex/                        Report-ready method, layup, and result tables
 results/laminate_run_.../     User-provided first sweep and fitted-model outputs
 results/synthetic_demo/       Pipeline demonstration data; explicitly not FEA
+docs/                         Requirement traceability, tests, generated API docs
+latex/project_report.tex      Report draft with methods, results, and limitations
 ```
 
 ## Setup
@@ -96,6 +98,14 @@ python -m pytest
 ```
 
 The test suite checks the configured ply count, total thickness, and positive effective stiffness. It does not launch MAPDL.
+
+## Project documentation
+
+- [Brief traceability](docs/requirements_traceability.md) lists the required evidence and remaining submission work.
+- [Test report](docs/test_report.md) separates automated checks from preliminary model comparisons and FEA limitations.
+- [LaTeX report draft](latex/project_report.tex) documents the problem, inputs, method, validation, limitations, and AI disclosure. Compile from `latex/` with LaTeX installed; resolve the marked approval and student-reflection items before submission.
+- Generate HTML API docs with `python docs/generate_api_docs.py`; the output is in `docs/api/`.
+- [MIT license](LICENSE) covers original project code and documentation. Third-party datasets, Ansys software, and solver outputs remain under their own terms.
 
 ## Assumptions and limitations
 

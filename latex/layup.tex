@@ -1,0 +1,66 @@
+% Stacking order follows layup.json: ply 1 bottom surface; ply 20 top surface.
+\begin{table}[htbp]
+\centering
+\caption{Specified 20-ply laminate, stacked from bottom to top. Zero degrees is the beam longitudinal direction.}
+\label{tab:layup}
+\begin{tabular}{rllrr}
+\toprule
+Ply & Material & Orientation & Cured thickness (mm) & Fiber areal mass (g/m$^2$) \\
+\midrule
+1 & CF 2×2 twill, 200 gsm & 0^\circ & 0.20 & 200 \\
+2 & UD E-glass/epoxy, 100 gsm & 0^\circ & 0.15 & 100 \\
+3 & CF 2×2 twill, 200 gsm & 0^\circ & 0.20 & 200 \\
+4 & UD E-glass/epoxy, 100 gsm & 0^\circ & 0.15 & 100 \\
+5 & CF 2×2 twill, 200 gsm & 0^\circ & 0.20 & 200 \\
+6 & UD E-glass/epoxy, 100 gsm & 0^\circ & 0.15 & 100 \\
+7 & CF 2×2 twill, 200 gsm & 0^\circ & 0.20 & 200 \\
+8 & UD E-glass/epoxy, 100 gsm & 0^\circ & 0.15 & 100 \\
+9 & CF 2×2 twill, 200 gsm & 0^\circ & 0.20 & 200 \\
+10 & UD E-glass/epoxy, 100 gsm & 0^\circ & 0.15 & 100 \\
+11 & CF 2×2 twill, 200 gsm & 0^\circ & 0.20 & 200 \\
+12 & UD E-glass/epoxy, 100 gsm & 0^\circ & 0.15 & 100 \\
+13 & CF 2×2 twill, 200 gsm & 0^\circ & 0.20 & 200 \\
+14 & UD E-glass/epoxy, 100 gsm & 0^\circ & 0.15 & 100 \\
+15 & CF 2×2 twill, 200 gsm & 0^\circ & 0.20 & 200 \\
+16 & UD E-glass/epoxy, 100 gsm & 0^\circ & 0.15 & 100 \\
+17 & CF 2×2 twill, 200 gsm & 0^\circ & 0.20 & 200 \\
+18 & UD E-glass/epoxy, 100 gsm & 0^\circ & 0.15 & 100 \\
+19 & CF 2×2 twill, 200 gsm & 0^\circ & 0.20 & 200 \\
+20 & UD E-glass/epoxy, 100 gsm & 0^\circ & 0.15 & 100 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The stack is $[\mathrm{CF}_{0}/\mathrm{GF}_{0}]_{10}$ from bottom to top. It
+contains 10 plies of each material, for a total cured thickness of 3.50 mm and
+specified dry-fiber areal mass of 3.0 kg/m$^2$. The sequence is unsymmetric
+through the thickness, so extension--bending coupling is possible.
+
+\begin{table}[htbp]
+\centering
+\caption{Representative orthotropic elastic inputs used by the layered-shell model. Moduli are in GPa.}
+\label{tab:ply-properties}
+\begin{tabular}{lrrrrrrrrrr}
+\toprule
+Material & $E_1$ & $E_2$ & $E_3$ & $\nu_{12}$ & $\nu_{23}$ & $\nu_{13}$ & $G_{12}$ & $G_{23}$ & $G_{13}$ & $\rho$ (kg/m$^3$) \\
+\midrule
+CF 2$\times$2 twill & 60.6 & 61.6 & 8.3 & 0.10 & 0.25 & 0.25 & 5.00 & 3.00 & 3.00 & 1724 \\
+UD E-glass/epoxy & 38.6 & 8.27 & 8.27 & 0.26 & 0.30 & 0.26 & 4.14 & 3.18 & 4.14 & 1111 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+For carbon twill, the 0/90 tensile moduli are taken from a supplier's 2$\times$2
+twill prepreg data; the reported 42\% resin content is used for a simple
+cured-density estimate. The missing in-plane shear and transverse constants
+are representative modeling assumptions. For glass, the input assumes
+unidirectional E-glass/epoxy and uses representative published lamina
+constants; the transverse constants are approximated with transverse symmetry.
+The glass resin mass fraction is assumed to be 40\%. These are deliberately
+approximate numerical inputs, not measured properties for the user's material
+system. The estimated cured laminate areal mass is 5.115 kg/m$^2$.
+
+The carbon values are based on the Gurit SE84LV 2$\times$2 twill prepreg
+properties, with selected missing values taken from generic carbon-fabric
+references \cite{guritSE84LV,performanceCarbonGeneric}. The glass in-plane
+properties are representative UD E-glass/epoxy values \cite{glassUDLamina}.

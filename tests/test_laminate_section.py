@@ -49,3 +49,25 @@ def test_new_design_contains_thickness_and_effective_stiffness_sweep():
     assert len(design) == 120
     assert set(("thickness_scale", "effective_stiffness_scale")) <= set(design.columns)
     assert design["tip_load_N"].eq(10.0).all()
+
+
+def test_least_squares_recovers_shared_effective_stiffness_scale():
+    import numpy as np
+    from fit_corrected_surrogate import fit_effective_stiffness_scale
+
+    class InverseStiffnessResponse:
+        def predict(self, x):
+            geometry_response = (0.01 * x[:, 0] + 0.02 * x[:, 1] + 0.03 * x[:, 2])
+            return geometry_response / x[:, 4]
+
+    x_cal = np.array([
+        [0.4, 0.04, 0.5, 1.0, 0.8],
+        [0.6, 0.06, 0.8, 1.0, 1.2],
+    ])
+    truth_scale = 1.08
+    target = InverseStiffnessResponse().predict(
+        np.column_stack([x_cal[:, :4], np.full(len(x_cal), truth_scale)]))
+    fitted, sse = fit_effective_stiffness_scale(
+        InverseStiffnessResponse(), x_cal, target, 1.0, (0.8, 1.2))
+    assert abs(fitted - truth_scale) < 1e-6
+    assert sse < 1e-15

@@ -1,10 +1,4 @@
-% Generated results will be inserted after running the configured PyAnsys sweep
-% and fitting the quadratic response surface. No 10 N FEA results are currently
-% available; the archived exploratory dataset is not used for these results.
-\section{Current sweep results}
-The 10 N laminate sweep and least-squares calibration are pending execution on
-the local Ansys installation. No held-out performance values are reported yet.
-After execution, include the generated table from
-\texttt{results/quadratic\_model/results\_table.tex} and summarize the
-calibration factor, held-out interpolation errors, mesh convergence, and
-small-deflection checks here.
+% Preliminary archived results from the one-point compliance-multiplier fit.
+% Re-run current scripts before using these as final project results.
+\section{Preliminary 10 N sweep results}
+The archived one-point fit achieved a held-out MAPE of 5.95\% against the analytical reference before correction and 7.27\% after correction. The correction therefore did not improve held-out transfer. See Table~\ref{tab:preliminary-results} and the archived files in \texttt{results/quadratic\_run\_2026-10-17\_one\_point\_calibration/}. The current direct-stiffness calibration remains to be rerun and evaluated.

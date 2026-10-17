@@ -14,7 +14,7 @@
 \maketitle
 
 \begin{abstract}
-This project develops a reproducible workflow for learning a structural response model from finite-element analysis (FEA), calibrating an effective section stiffness from a small number of known reference observations, and checking predictions on held-out geometries. The method is first exercised on a straight, linearly width-tapered cantilever with an analytical small-deflection reference before application to a curved composite leaf-spring landing gear. The current PyAnsys input specifies a 120-case, 10 N static laminate sweep over geometry, thickness, and effective stiffness. A full quadratic response surface models FEA compliance; bounded least squares estimates the effective stiffness scale directly from analytical observations. Held-out cases test transfer to unseen geometries at the same thickness and fitted stiffness. The current sweep has not yet been run; no new performance metrics or engineering prediction are claimed. Earlier 100 N outputs remain archived as preliminary work and are not evidence for the current configuration.
+This project develops a reproducible workflow for learning a structural response model from finite-element analysis (FEA), calibrating an effective section stiffness from a small number of known reference observations, and checking predictions on held-out geometries. The method is first exercised on a straight, linearly width-tapered cantilever with an analytical small-deflection reference before application to a curved composite leaf-spring landing gear. The current PyAnsys input specifies a 120-case, 10 N static laminate sweep over geometry, thickness, and effective stiffness. A full quadratic response surface models FEA compliance; bounded least squares estimates the effective stiffness scale directly from analytical observations. Held-out cases test transfer to unseen geometries at the same thickness and fitted stiffness. A 120-case, 10 N PyMAPDL SHELL181 sweep and quadratic fit are available as a preliminary archived run. That fit used the earlier one-point compliance-multiplier calibration and is not the output of the repository's revised direct-stiffness calibration workflow. On 24 held-out cases, calibration increased MAPE against the analytical reference from 5.95\% to 7.27\%. These results are retained as a baseline; rerun the current workflow before treating them as final. Earlier 100 N outputs also remain archived as exploratory work.
 \end{abstract}
 
 \section{Problem definition and scope}
@@ -71,7 +71,24 @@ The model inputs are $(L,b_0,r_b,h,s_E)$ and the output is $C$. A fixed random s
 The fitted scale multiplies all elastic and shear moduli, so bending and transverse shear stiffness change together. One calibration configuration is the mathematical minimum for one scalar; the default selects training geometries near the centre of the geometry domain. The held-out geometries are predicted at the same $h_c$ and $\widehat{s}_E$ and compared with the analytical equation evaluated at the reference scale $s_{E,true}$. This isolates geometry transfer in the analytical comparison. A larger calibration set can estimate the same scalar more robustly. The nominal and reference scales are set in the input configuration; both equal 1.0 for this benchmark.
 
 \section{Results and validation}
-The 10 N sweep and updated fitting workflow have not yet been executed, so held-out metrics and plots are pending. After execution, include the generated results table and figures here. The comparison will test interpolation within the sampled parameter region; it will not by itself demonstrate extrapolation capacity. It evaluates the workflow against an analytical benchmark under stated assumptions, not against independent physical observations. No physical test results are part of the project and no physical validation claim is made.
+A preliminary 10 N sweep is archived in \texttt{results/quadratic\_run\_2026-10-17\_one\_point\_calibration/}. It contains 120 PyMAPDL SHELL181 cases, with 96 training cases, 24 held out, and one analytical calibration configuration (case 79). The archived fit used the earlier scalar compliance-multiplier implementation. The calibrated multiplier was $\beta=1.06267$, equivalent under the model's shared scaling assumption to an effective stiffness factor $1/\beta=0.94102$.
+
+\begin{table}[H]
+\centering
+\caption{Held-out performance in the archived one-point calibration run.}
+\label{tab:preliminary-results}
+\begin{tabular}{lrrrr}
+\toprule
+Comparison & RMSE (m/N) & MAE (m/N) & $R^2$ & MAPE (\%) \\
+\midrule
+Quadratic vs. FEA & $3.624\times10^{-4}$ & $2.712\times10^{-4}$ & 0.9876 & 5.929 \\
+Raw quadratic vs. analytical & $3.621\times10^{-4}$ & $2.719\times10^{-4}$ & 0.9876 & 5.946 \\
+Corrected quadratic vs. analytical & $6.213\times10^{-4}$ & $4.499\times10^{-4}$ & 0.9636 & 7.265 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The correction worsened held-out MAPE and $R^2$; one analytical point was insufficient to produce a transferable correction in this run. The sweep's $|\delta|/L$ ratio ranges from approximately 0.034 to 0.330, so cases near the upper end may not meet the analytical small-deflection assumption. These figures are preliminary and were generated by the earlier fitting workflow. The updated direct-stiffness calibration must be rerun and evaluated on an untouched test set. Even then, the comparison tests interpolation within the sampled parameter region; it does not by itself demonstrate extrapolation capacity. It evaluates the workflow against an analytical benchmark under stated assumptions, not independent physical observations. No physical test results are part of the project and no physical validation claim is made.
 
 \section{Validity, limitations, and next work}
 The 10 N load is chosen to reduce deflection relative to the archived exploratory case, but this does not establish small-deflection validity across the new thickness and stiffness range. Inspect $|\delta|/L$ for all cases and confirm compliance is independent of load in representative linear analyses before using the analytical comparison.

@@ -1,0 +1,47 @@
+{
+  "input_file": "results/quadratic_sweep.csv",
+  "data_origin": "PyMAPDL SHELL181 FEA",
+  "n_total": 120,
+  "n_train": 96,
+  "n_test": 24,
+  "n_analytical_calibration": 1,
+  "calibration_case_ids": [
+    79
+  ],
+  "features": [
+    "length_m",
+    "root_width_m",
+    "taper_ratio",
+    "thickness_scale",
+    "effective_stiffness_scale"
+  ],
+  "target": "tip compliance |delta|/P [m/N]",
+  "response_surface": "full quadratic polynomial (21 coefficients for five inputs)",
+  "calibration": {
+    "method": "one-parameter least-squares fit on training cases",
+    "compliance_multiplier_beta": 1.0626721152948304,
+    "effective_section_stiffness_factor": 0.9410240332904167,
+    "relationship": "C_corrected = beta * C_quadratic; effective stiffness factor = 1/beta"
+  },
+  "quadratic_vs_fea_test": {
+    "rmse_m_per_N": 0.00036241234428524295,
+    "mae_m_per_N": 0.000271248956755208,
+    "r2": 0.9875859173805412,
+    "mean_absolute_percentage_error_percent": 5.928639582357187,
+    "max_absolute_percentage_error_percent": 16.401054967695014
+  },
+  "corrected_quadratic_vs_analytical_test": {
+    "rmse_m_per_N": 0.0006212733038660119,
+    "mae_m_per_N": 0.00044989734502301726,
+    "r2": 0.9635590492944311,
+    "mean_absolute_percentage_error_percent": 7.265014722677976,
+    "max_absolute_percentage_error_percent": 23.67235099797768
+  },
+  "raw_quadratic_vs_analytical_test": {
+    "rmse_m_per_N": 0.0003620961608215282,
+    "mae_m_per_N": 0.00027189175655720666,
+    "r2": 0.9876213821888725,
+    "mean_absolute_percentage_error_percent": 5.945948509141093,
+    "max_absolute_percentage_error_percent": 16.37865454262505
+  }
+}

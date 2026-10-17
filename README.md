@@ -59,6 +59,10 @@ python src/plot_results.py `
 
 Run the solver-independent checks with `python -m pytest`. These checks do not launch MAPDL.
 
+## Archived preliminary 10 N run
+
+A 120-case 10 N SHELL181 sweep and one-point calibration output are preserved in [`results/quadratic_run_2026-10-17_one_point_calibration/`](results/quadratic_run_2026-10-17_one_point_calibration/). This was produced with the earlier compliance-multiplier fitter, before the revised direct effective-stiffness calibration. On 24 held-out cases, the raw model had 5.95% MAPE against the analytical reference; the one-point correction increased it to 7.27%. Treat this as a baseline only and rerun with the current scripts. The run's deflection-to-length ratio reached 0.330, so the highest-displacement cases may violate the benchmark's small-deflection assumption.
+
 ## Assumptions and limits
 
 - Static linear elasticity and small-deflection beam theory are used. Confirm the 10 N response is within the linear small-deflection range for every design; the applied load alone does not guarantee that.

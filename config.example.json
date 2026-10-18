@@ -1,7 +1,7 @@
 {
   "units": "SI",
   "baseline": {
-    "length_m": 0.5,
+    "length_m": 0.25,
     "root_width_m": 0.05,
     "taper_ratio": 0.6,
     "tip_load_N": 10.0

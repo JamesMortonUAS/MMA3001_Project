@@ -31,7 +31,21 @@ python src/run_laminate_shell_sweep.py `
   --ny 6
 ```
 
-The model uses SHELL181, 20 explicit plies, three through-thickness integration points per ply, a clamped root, and an evenly distributed 10 N transverse force on the tip edge. `--nx` and `--ny` are mesh divisions along the beam and across its width. Before interpreting results, repeat representative cases with a finer mesh and record the Ansys/MAPDL release and PyMAPDL version.
+The model uses SHELL181, 20 explicit plies, three through-thickness integration points per ply, a clamped root, and an evenly distributed 10 N transverse force on the tip edge. `--nx` and `--ny` are mesh divisions along the beam and across its width. The current benchmark length is 0.25 m, so the DOE spans 0.20–0.30 m.
+
+### Run a mesh-convergence study
+
+The convergence runner analyzes three geometries (baseline, narrow/high-taper, and wide/low-taper) at the same 0.25 m length, 10 N load, nominal laminate thickness, and nominal material stiffness. It refines both mesh directions together and reports compliance change between successive levels and relative to the finest mesh. It also compares each FEA result with the analytical benchmark; that comparison is a model-form check, while convergence is assessed from FEA mesh-to-mesh changes.
+
+```powershell
+python src/run_mesh_convergence.py `
+  --config config.quadratic.example.json `
+  --layup layup.json `
+  --output results/mesh_convergence_0p25m.csv `
+  --meshes 20x3 40x6 80x12 160x24
+```
+
+This requires the local licensed MAPDL installation. Outputs are a CSV and a compliance-versus-element-count PNG. A practical convergence criterion is a change below 1% between the two finest levels for all three geometries; if that is not met, add a finer level. Record the solver release and inspect the MAPDL output before treating a converged displacement as evidence that the element formulation and boundary conditions are appropriate.
 
 ### Fit and calibrate the quadratic model
 
@@ -77,7 +91,7 @@ Run the solver-independent checks with `python -m pytest`. These checks do not l
 
 ## Latest calibration results
 
-The latest archived run is [`results/quadratic_run_2026-10-17_direct_stiffness_calibration/`](results/quadratic_run_2026-10-17_direct_stiffness_calibration/). It uses one analytical calibration observation to estimate a shared effective stiffness scale of 0.97609. On 24 held-out geometries, MAPE improved from 5.323% to 5.128%, while RMSE, MAE, and $R^2$ worsened. The calibration therefore has a mixed effect across metrics and requires robustness checks with additional calibration cases and alternate splits. The maximum deflection-to-length ratio was 0.330; the highest-displacement cases may violate the analytical small-deflection assumption.
+The latest archived run is [`results/quadratic_run_2026-10-17_direct_stiffness_calibration/`](results/quadratic_run_2026-10-17_direct_stiffness_calibration/). It uses one analytical calibration observation to estimate a shared effective stiffness scale of 0.97609. On 24 held-out geometries, MAPE improved from 5.323% to 5.128%, while RMSE, MAE, and $R^2$ worsened. The calibration therefore has a mixed effect across metrics and requires robustness checks with additional calibration cases and alternate splits. That archived sweep used a 0.5 m baseline length; its maximum deflection-to-length ratio of 0.330 is not representative of the newly shortened 0.25 m benchmark. The updated sweep must be rerun before reporting new response-surface or calibration results.
 
 The earlier compliance-multiplier fit is preserved in [`results/quadratic_run_2026-10-17_one_point_calibration/`](results/quadratic_run_2026-10-17_one_point_calibration/) for comparison. That correction increased held-out MAPE from 5.95% to 7.27%.
 

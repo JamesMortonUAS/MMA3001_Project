@@ -1,3 +1,7 @@
+> **Archived run:** these outputs are from the earlier 120-case Latin-hypercube study with four calibration observations and two independently fitted stiffness scales. They are not results from the updated tensor-grid, one-point workflow. The updated script writes to `results/property_transfer_grid/`; see [the current method](../../docs/property_transfer_study.md).
+
+> **Archived run:** these outputs are from the earlier 120-case Latin-hypercube study with four calibration observations and two independently fitted stiffness scales. They are not results from the updated tensor-grid, one-point workflow. The updated script writes to `results/property_transfer_grid/`; see [the current method](../../docs/property_transfer_study.md).
+
 # Hidden-property transfer study results
 
 **Run date:** 21 October 2026  

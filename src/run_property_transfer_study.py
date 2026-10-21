@@ -1,15 +1,16 @@
-"""Generate and evaluate a hidden-property, FEA-to-FEA calibration study.
+"""Generate a tensor-grid, hidden-property FEA transfer study.
 
-Dataset A trains a mechanics-informed regression over equivalent beam
-rigidities and two laminate property scales. Dataset B uses a fixed, withheld pair of property
-scales at several known width/thickness combinations. A small, geometry-spread
-subset of B calibrates the two scales; the remaining B cases are held out for
-validation. Run with a licensed MAPDL installation for the FEA stages.
+Dataset A is a complete linearly spaced grid in width, thickness, in-plane
+stiffness and transverse-shear stiffness. Configured laminate property pairs
+are excluded from training. Dataset B evaluates one excluded property pair
+over in-range and out-of-range geometry. One observation fits one common
+compliance correction factor; it cannot identify independent in-plane and
+shear stiffness scales. Run the FEA stages with licensed MAPDL.
 
-Example (run all 132 FEA cases, then fit/calibrate):
+Example (72 training FEA cases plus 25 target-laminate FEA cases):
     python src/run_property_transfer_study.py --stage all
 
-The separate stages are useful when the FEA datasets have already been run:
+Stages:
     --stage dataset-a
     --stage dataset-b
     --stage calibrate
@@ -18,6 +19,7 @@ from __future__ import annotations
 
 import argparse
 import copy
+import itertools
 import json
 from pathlib import Path
 from types import SimpleNamespace
@@ -26,7 +28,6 @@ import joblib
 import numpy as np
 import pandas as pd
 from scipy.optimize import least_squares
-from scipy.stats import qmc
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from sklearn.model_selection import KFold, cross_val_predict
@@ -43,12 +44,7 @@ PROPERTY_NAMES = ["in_plane_stiffness_scale", "transverse_shear_stiffness_scale"
 def scale_material_layup(layup: dict, thickness_scale: float,
                          in_plane_scale: float,
                          transverse_shear_scale: float) -> dict:
-    """Copy a layup with consistent thickness and orthotropic property scales.
-
-    In-plane elastic terms (EX, EY, GXY) and transverse shear terms
-    (GXZ, GYZ) are scaled separately. Poisson ratios and densities are fixed.
-    The 20-ply sequence itself remains the supplied project sequence.
-    """
+    """Copy a layup with separate in-plane and transverse-shear property scales."""
     values = (thickness_scale, in_plane_scale, transverse_shear_scale)
     if any(not np.isfinite(value) or value <= 0 for value in values):
         raise ValueError("Thickness and stiffness scales must be positive and finite")
@@ -88,41 +84,62 @@ def section_record(layup: dict, width_m: float, shear_correction: float) -> dict
 
 
 def make_dataset_a_design(config: dict) -> pd.DataFrame:
-    """Generate Dataset A by Latin hypercube over geometry and property scales."""
+    """Create a full tensor-product grid with linear spacing on each axis."""
     spec = config["dataset_a"]
-    n = int(spec["n_cases"])
-    if n < 20:
-        raise ValueError("Dataset A needs at least 20 cases for stable five-fold fitting")
-    unit = qmc.LatinHypercube(d=4, seed=int(spec["seed"])).random(n)
+    levels = int(spec["grid_levels"])
+    if levels < 2:
+        raise ValueError("dataset_a.grid_levels must be at least 2")
     names = ["width_m", "thickness_scale", *PROPERTY_NAMES]
-    bounds = [spec[name] for name in names]
-    values = [lo + unit[:, i] * (hi - lo) for i, (lo, hi) in enumerate(bounds)]
-    return pd.DataFrame({"case_id": np.arange(n), **{
-        name: values[i] for i, name in enumerate(names)
-    }})
+    axes = []
+    for name in names:
+        lower, upper = map(float, spec[name])
+        if not np.isfinite(lower + upper) or lower <= 0 or upper <= lower:
+            raise ValueError(f"Invalid positive bounds for {name}: {spec[name]}")
+        axes.append(np.linspace(lower, upper, levels))
+    rows = [dict(zip(names, point)) for point in itertools.product(*axes)]
+    design = pd.DataFrame(rows)
+    design.insert(0, "case_id", np.arange(len(design), dtype=int))
+    return design
+
+
+def filter_training_laminates(data: pd.DataFrame, excluded_pairs: list[dict]) -> pd.DataFrame:
+    """Remove configured in-plane/shear scale pairs from Dataset A training."""
+    keep = np.ones(len(data), dtype=bool)
+    for pair in excluded_pairs:
+        ip = float(pair["in_plane_stiffness_scale"])
+        shear = float(pair["transverse_shear_stiffness_scale"])
+        matches = (
+            np.isclose(data["in_plane_stiffness_scale"].to_numpy(float), ip, rtol=0, atol=1e-10)
+            & np.isclose(data["transverse_shear_stiffness_scale"].to_numpy(float),
+                         shear, rtol=0, atol=1e-10)
+        )
+        keep &= ~matches
+    return data.loc[keep].reset_index(drop=True)
 
 
 def make_dataset_b_design(config: dict) -> pd.DataFrame:
-    """Create a width/thickness grid at one fixed hidden property setting."""
+    """Create target-laminate geometry grid and tag in-range/extrapolation cases."""
     spec = config["dataset_b"]
+    a_spec = config["dataset_a"]
+    w_lo, w_hi = map(float, a_spec["width_m"])
+    t_lo, t_hi = map(float, a_spec["thickness_scale"])
     rows = []
     case_id = 0
     for thickness_scale in spec["thickness_scales"]:
         for width_m in spec["widths_m"]:
-            rows.append({"case_id": case_id, "width_m": float(width_m),
-                         "thickness_scale": float(thickness_scale)})
+            inside = w_lo <= float(width_m) <= w_hi and t_lo <= float(thickness_scale) <= t_hi
+            rows.append({
+                "case_id": case_id,
+                "width_m": float(width_m),
+                "thickness_scale": float(thickness_scale),
+                "geometry_region": "interpolation" if inside else "extrapolation",
+            })
             case_id += 1
     return pd.DataFrame(rows)
 
 
 def mechanics_basis(section_data: pd.DataFrame, length_m: float) -> np.ndarray:
-    """Create bending/shear compliance bases from the equivalent rigidities.
-
-    For a uniform cantilever, the Timoshenko terms scale as L^3/(3 EI) and
-    L/(kGA). Their coefficients are learned from Dataset A FEA, rather than
-    fixed to analytical values. This gives the regression the correct
-    asymptotic behavior while allowing the FEA to set the correction factors.
-    """
+    """Create bending/shear compliance bases from equivalent section rigidities."""
     ei = section_data["EI_Nm2"].to_numpy(float)
     kga = section_data["kGA_N"].to_numpy(float)
     if length_m <= 0 or np.any(ei <= 0) or np.any(kga <= 0):
@@ -137,9 +154,9 @@ def response_surface():
 
 def select_calibration_indices(data: pd.DataFrame, n_points: int,
                                seed: int) -> np.ndarray:
-    """Choose a reproducible maximin subset across width and thickness."""
-    if not 2 <= n_points < len(data):
-        raise ValueError("Use at least two calibration cases and leave B holdouts")
+    """Select the centre case first, then maximin cases if requested."""
+    if not 1 <= n_points < len(data):
+        raise ValueError("Calibration must use at least one case and leave validation cases")
     geo = data[["width_m", "thickness_scale"]].to_numpy(float)
     mean = geo.mean(axis=0)
     scale = geo.std(axis=0)
@@ -173,30 +190,35 @@ def scores(y_true: np.ndarray, y_pred: np.ndarray) -> dict:
 def design_properties(layup: dict, geometry: pd.DataFrame,
                       in_plane_scale: float, shear_scale: float,
                       shear_correction: float) -> pd.DataFrame:
-    in_plane_values = np.broadcast_to(np.asarray(in_plane_scale, float), (len(geometry),))
-    shear_values = np.broadcast_to(np.asarray(shear_scale, float), (len(geometry),))
     rows = []
-    for position, row in enumerate(geometry.itertuples(index=False)):
+    for row in geometry.itertuples(index=False):
         scaled = scale_material_layup(
-            layup, float(row.thickness_scale), float(in_plane_values[position]),
-            float(shear_values[position]))
-        section = section_record(scaled, float(row.width_m), shear_correction)
-        rows.append(section)
+            layup, float(row.thickness_scale), in_plane_scale, shear_scale
+        )
+        rows.append(section_record(scaled, float(row.width_m), shear_correction))
     return pd.DataFrame(rows, index=geometry.index)
 
 
 def create_fea_data(config: dict, layup: dict, dataset: str,
                     output: Path) -> None:
-    """Run MAPDL for Dataset A or B and save response plus section properties."""
+    """Run MAPDL for training Dataset A or target-laminate Dataset B."""
     if dataset == "A":
-        geometry = make_dataset_a_design(config)
-        in_plane = geometry["in_plane_stiffness_scale"].to_numpy()
-        shear = geometry["transverse_shear_stiffness_scale"].to_numpy()
-    else:
+        full_design = make_dataset_a_design(config)
+        geometry = filter_training_laminates(
+            full_design, config["dataset_a"].get("excluded_laminates", [])
+        )
+        excluded_count = len(full_design) - len(geometry)
+        print(f"Dataset A: {len(geometry)} training cases; "
+              f"{excluded_count} cases from excluded laminate pairs not run.")
+        in_plane = geometry["in_plane_stiffness_scale"].to_numpy(float)
+        shear = geometry["transverse_shear_stiffness_scale"].to_numpy(float)
+    elif dataset == "B":
         geometry = make_dataset_b_design(config)
         target = config["dataset_b"]
         in_plane = np.full(len(geometry), float(target["hidden_in_plane_stiffness_scale"]))
         shear = np.full(len(geometry), float(target["hidden_transverse_shear_stiffness_scale"]))
+    else:
+        raise ValueError("dataset must be 'A' or 'B'")
 
     from ansys.mapdl.core import launch_mapdl
 
@@ -206,7 +228,8 @@ def create_fea_data(config: dict, layup: dict, dataset: str,
     try:
         for pos, row in enumerate(geometry.itertuples(index=False)):
             case_layup = scale_material_layup(
-                layup, float(row.thickness_scale), float(in_plane[pos]), float(shear[pos]))
+                layup, float(row.thickness_scale), float(in_plane[pos]), float(shear[pos])
+            )
             design_row = SimpleNamespace(
                 length_m=float(beam["length_m"]),
                 root_width_m=float(row.width_m),
@@ -218,13 +241,14 @@ def create_fea_data(config: dict, layup: dict, dataset: str,
             uz, mass, total_thickness = solve_case(
                 mapdl, design_row, case_layup,
                 int(config["mesh"]["nx"]), int(config["mesh"]["ny"]),
-                int(config["mesh"].get("integration_points_per_ply", 3)))
+                int(config["mesh"].get("integration_points_per_ply", 3))
+            )
             section = section_record(
                 case_layup, float(row.width_m),
-                float(beam.get("shear_correction_factor", 5.0 / 6.0)))
+                float(beam.get("shear_correction_factor", 5.0 / 6.0))
+            )
             result = {
-                **row._asdict(),
-                **section,
+                **row._asdict(), **section,
                 "laminate_thickness_from_fea_m": total_thickness,
                 "mass_kg": mass,
                 "tip_load_N": float(beam["tip_load_N"]),
@@ -249,7 +273,7 @@ def create_fea_data(config: dict, layup: dict, dataset: str,
     print(f"Saved Dataset {dataset}: {output}")
     if dataset == "B":
         truth = {
-            "description": "Hidden target FEA material scales; excluded from calibration fitting.",
+            "description": "Hidden Dataset B material scales; post-fit audit only.",
             "in_plane_stiffness_scale": float(config["dataset_b"]["hidden_in_plane_stiffness_scale"]),
             "transverse_shear_stiffness_scale": float(config["dataset_b"]["hidden_transverse_shear_stiffness_scale"]),
         }
@@ -259,11 +283,11 @@ def create_fea_data(config: dict, layup: dict, dataset: str,
 def fit_calibrate_validate(config: dict, layup: dict, data_a_path: Path,
                            data_b_path: Path, output_dir: Path,
                            n_calibration: int | None = None) -> dict:
-    """Fit Model A, calibrate property scales on B subset, score B holdouts."""
+    """Fit Model A, calibrate one common correction from one B case, and validate."""
     data_a = pd.read_csv(data_a_path)
     data_b = pd.read_csv(data_b_path)
     need_a = {"EI_Nm2", "kGA_N", "compliance_m_per_N"}
-    need_b = set(OBSERVATION_COLUMNS)
+    need_b = set(OBSERVATION_COLUMNS) | {"geometry_region"}
     if missing := sorted(need_a - set(data_a.columns)):
         raise ValueError(f"Dataset A missing columns: {missing}")
     if missing := sorted(need_b - set(data_b.columns)):
@@ -274,89 +298,132 @@ def fit_calibrate_validate(config: dict, layup: dict, data_a_path: Path,
         raise ValueError("Dataset A rigidities and compliances must be positive")
     if (data_b[["width_m", "thickness_scale", "compliance_m_per_N"]] <= 0).any().any():
         raise ValueError("Dataset B geometry and compliances must be positive")
+    if not set(data_b["geometry_region"].unique()) <= {"interpolation", "extrapolation"}:
+        raise ValueError("Dataset B geometry_region must be interpolation or extrapolation")
 
     length_m = float(config["beam"]["length_m"])
     x_a = mechanics_basis(data_a, length_m)
     y_a = data_a["compliance_m_per_N"].to_numpy(float)
-    cv = KFold(n_splits=5, shuffle=True, random_state=int(config["dataset_a"]["seed"]))
+    cv = KFold(n_splits=5, shuffle=True, random_state=int(config["dataset_a"].get("seed", 0)))
     cv_predictions = cross_val_predict(response_surface(), x_a, y_a, cv=cv)
     model = response_surface().fit(x_a, y_a)
 
     n_cal = int(n_calibration if n_calibration is not None
-                else config["calibration"]["n_points"])
+                else config["calibration"].get("n_points", 1))
     cal_idx = select_calibration_indices(
-        data_b, n_cal, int(config["calibration"].get("random_seed", 0)))
+        data_b, n_cal, int(config["calibration"].get("random_seed", 0))
+    )
     test_mask = np.ones(len(data_b), dtype=bool)
     test_mask[cal_idx] = False
     cal = data_b.iloc[cal_idx].reset_index(drop=True)
-    test = data_b.loc[test_mask].reset_index(drop=True)
+    validation = data_b.loc[test_mask].reset_index(drop=True)
     beam = config["beam"]
     kappa = float(beam.get("shear_correction_factor", 5.0 / 6.0))
 
-    def predict_at_scales(geometry: pd.DataFrame, scales: np.ndarray) -> np.ndarray:
-        section = design_properties(layup, geometry, float(scales[0]),
-                                    float(scales[1]), kappa)
+    def predict_at_common_scale(geometry: pd.DataFrame, common_scale: float) -> np.ndarray:
+        section = design_properties(layup, geometry, common_scale, common_scale, kappa)
         return model.predict(mechanics_basis(section, length_m))
 
-    nominal_scales = np.asarray(config["calibration"].get("initial_scales", [1.0, 1.0]), float)
-    cal_observed = cal["compliance_m_per_N"].to_numpy(float)
+    initial = float(config["calibration"].get("initial_common_stiffness_scale", 1.0))
+    lo, hi = map(float, config["calibration"]["common_stiffness_scale_bounds"])
+    if not lo < initial < hi:
+        raise ValueError("Initial common stiffness scale must lie strictly inside its bounds")
+    observed = cal["compliance_m_per_N"].to_numpy(float)
 
     def relative_residual(scales: np.ndarray) -> np.ndarray:
-        predicted = predict_at_scales(cal, scales)
-        return (predicted - cal_observed) / cal_observed
+        predicted = predict_at_common_scale(cal, float(scales[0]))
+        return (predicted - observed) / observed
 
-    lo = [float(config["calibration"]["in_plane_scale_bounds"][0]),
-          float(config["calibration"]["transverse_shear_scale_bounds"][0])]
-    hi = [float(config["calibration"]["in_plane_scale_bounds"][1]),
-          float(config["calibration"]["transverse_shear_scale_bounds"][1])]
-    if np.any(nominal_scales <= lo) or np.any(nominal_scales >= hi):
-        raise ValueError("Initial property scales must lie strictly inside calibration bounds")
-    fit = least_squares(relative_residual, nominal_scales, bounds=(lo, hi), method="trf")
+    fit = least_squares(relative_residual, x0=np.asarray([initial]),
+                        bounds=(np.asarray([lo]), np.asarray([hi])), method="trf")
     if not fit.success or not np.all(np.isfinite(fit.x)):
         raise RuntimeError(f"Calibration did not converge: {fit.message}")
-    fitted_scales = fit.x
+    fitted_scale = float(fit.x[0])
 
-    nominal_prediction = predict_at_scales(test, nominal_scales)
-    calibrated_prediction = predict_at_scales(test, fitted_scales)
-    test_result = test.copy()
-    test_result["nominal_prediction_m_per_N"] = nominal_prediction
-    test_result["calibrated_prediction_m_per_N"] = calibrated_prediction
-    test_result["nominal_error_percent"] = 100 * (nominal_prediction - test_result["compliance_m_per_N"]) / test_result["compliance_m_per_N"]
-    test_result["calibrated_error_percent"] = 100 * (calibrated_prediction - test_result["compliance_m_per_N"]) / test_result["compliance_m_per_N"]
-    test_result["is_calibration_case"] = False
+    nominal_prediction = predict_at_common_scale(validation, initial)
+    calibrated_prediction = predict_at_common_scale(validation, fitted_scale)
+    validation_result = validation.copy()
+    validation_result["nominal_prediction_m_per_N"] = nominal_prediction
+    validation_result["calibrated_prediction_m_per_N"] = calibrated_prediction
+    validation_result["nominal_error_percent"] = (
+        100 * (nominal_prediction - validation_result["compliance_m_per_N"])
+        / validation_result["compliance_m_per_N"]
+    )
+    validation_result["calibrated_error_percent"] = (
+        100 * (calibrated_prediction - validation_result["compliance_m_per_N"])
+        / validation_result["compliance_m_per_N"]
+    )
+    validation_result["is_calibration_case"] = False
 
     cal_result = cal.copy()
-    cal_result["nominal_prediction_m_per_N"] = predict_at_scales(cal, nominal_scales)
-    cal_result["calibrated_prediction_m_per_N"] = predict_at_scales(cal, fitted_scales)
-    cal_result["nominal_error_percent"] = 100 * (cal_result["nominal_prediction_m_per_N"] - cal_result["compliance_m_per_N"]) / cal_result["compliance_m_per_N"]
-    cal_result["calibrated_error_percent"] = 100 * (cal_result["calibrated_prediction_m_per_N"] - cal_result["compliance_m_per_N"]) / cal_result["compliance_m_per_N"]
+    cal_result["nominal_prediction_m_per_N"] = predict_at_common_scale(cal, initial)
+    cal_result["calibrated_prediction_m_per_N"] = predict_at_common_scale(cal, fitted_scale)
+    cal_result["nominal_error_percent"] = (
+        100 * (cal_result["nominal_prediction_m_per_N"] - cal_result["compliance_m_per_N"])
+        / cal_result["compliance_m_per_N"]
+    )
+    cal_result["calibrated_error_percent"] = (
+        100 * (cal_result["calibrated_prediction_m_per_N"] - cal_result["compliance_m_per_N"])
+        / cal_result["compliance_m_per_N"]
+    )
     cal_result["is_calibration_case"] = True
-    predictions = pd.concat([cal_result, test_result], ignore_index=True).sort_values("case_id")
+    predictions = pd.concat([cal_result, validation_result], ignore_index=True).sort_values("case_id")
+
+    group_scores = {}
+    for region in ("interpolation", "extrapolation"):
+        group = validation_result.loc[validation_result["geometry_region"] == region]
+        if not group.empty:
+            group_scores[region] = {
+                "nominal": scores(group["compliance_m_per_N"].to_numpy(),
+                                  group["nominal_prediction_m_per_N"].to_numpy()),
+                "calibrated": scores(group["compliance_m_per_N"].to_numpy(),
+                                     group["calibrated_prediction_m_per_N"].to_numpy()),
+            }
 
     truth_path = data_b_path.with_name("dataset_B_hidden_truth.json")
     hidden_truth = json.loads(truth_path.read_text()) if truth_path.exists() else None
+    excluded_pairs = config["dataset_a"].get("excluded_laminates", [])
     metrics = {
-        "method": "Dataset A mechanics-informed regression; Dataset B least-squares calibration of in-plane and transverse-shear stiffness scales",
+        "method": "Dataset A tensor-grid mechanics regression; one-point calibration of a common stiffness scale",
         "data_a": str(data_a_path), "data_b": str(data_b_path),
-        "n_dataset_a": len(data_a), "n_dataset_b": len(data_b),
+        "n_dataset_a_training": len(data_a), "n_dataset_b": len(data_b),
         "n_calibration": len(cal), "calibration_case_ids": cal["case_id"].astype(int).tolist(),
-        "validation_case_ids": test["case_id"].astype(int).tolist(),
+        "validation_case_ids": validation["case_id"].astype(int).tolist(),
+        "validation_regions": {
+            "interpolation_case_ids": validation.loc[
+                validation["geometry_region"] == "interpolation", "case_id"
+            ].astype(int).tolist(),
+            "extrapolation_case_ids": validation.loc[
+                validation["geometry_region"] == "extrapolation", "case_id"
+            ].astype(int).tolist(),
+        },
+        "dataset_a_excluded_laminate_pairs": excluded_pairs,
         "model_features": MODEL_FEATURES,
         "surrogate_dataset_a_5fold_cv": scores(y_a, cv_predictions),
-        "nominal_scales": dict(zip(PROPERTY_NAMES, nominal_scales.tolist())),
-        "fitted_scales": dict(zip(PROPERTY_NAMES, fitted_scales.tolist())),
+        "nominal_common_stiffness_scale": initial,
+        "fitted_common_stiffness_scale": fitted_scale,
         "hidden_target_scales_for_post_fit_audit": hidden_truth,
         "calibration_relative_residual_sse": float(np.sum(fit.fun**2)),
-        "nominal_dataset_b_holdout": scores(test["compliance_m_per_N"].to_numpy(), nominal_prediction),
-        "calibrated_dataset_b_holdout": scores(test["compliance_m_per_N"].to_numpy(), calibrated_prediction),
-        "interpretation": "B calibration cases are used only to fit the two material scales. B holdouts are excluded from surrogate fitting and scale fitting. Both datasets are FEA; this tests transfer between FEA property settings, not physical accuracy.",
+        "nominal_validation": scores(validation["compliance_m_per_N"].to_numpy(),
+                                     nominal_prediction),
+        "calibrated_validation": scores(validation["compliance_m_per_N"].to_numpy(),
+                                        calibrated_prediction),
+        "validation_by_region": group_scores,
+        "interpretation": (
+            "One compliance observation fits one common stiffness correction, not "
+            "independent in-plane and transverse-shear scales. Interpolation and "
+            "extrapolation are classified by whether both geometry inputs lie inside "
+            "the Dataset A width/thickness bounds. FEA-to-FEA only."
+        ),
     }
     output_dir.mkdir(parents=True, exist_ok=True)
     predictions.to_csv(output_dir / "dataset_b_predictions.csv", index=False)
     (output_dir / "metrics.json").write_text(json.dumps(metrics, indent=2))
-    joblib.dump({"model_a": model, "features": MODEL_FEATURES,
-                 "fitted_scales": dict(zip(PROPERTY_NAMES, fitted_scales.tolist()))},
-                output_dir / "model_a_calibrated.joblib")
+    joblib.dump({
+        "model_a": model,
+        "features": MODEL_FEATURES,
+        "fitted_common_stiffness_scale": fitted_scale,
+    }, output_dir / "model_a_calibrated.joblib")
     print(json.dumps(metrics, indent=2))
     return metrics
 
@@ -366,9 +433,9 @@ def main() -> None:
     parser.add_argument("--stage", choices=("all", "dataset-a", "dataset-b", "calibrate"), default="all")
     parser.add_argument("--config", default="config.hidden_property.example.json")
     parser.add_argument("--layup", default="layup.json")
-    parser.add_argument("--dataset-a", default="results/property_transfer/dataset_A.csv")
-    parser.add_argument("--dataset-b", default="results/property_transfer/dataset_B.csv")
-    parser.add_argument("--output-dir", default="results/property_transfer/model")
+    parser.add_argument("--dataset-a", default="results/property_transfer_grid/dataset_A.csv")
+    parser.add_argument("--dataset-b", default="results/property_transfer_grid/dataset_B.csv")
+    parser.add_argument("--output-dir", default="results/property_transfer_grid/model")
     parser.add_argument("--calibration-points", type=int, default=None)
     args = parser.parse_args()
 

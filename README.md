@@ -49,7 +49,7 @@ This requires the local licensed MAPDL installation. Outputs are a CSV and a com
 
 ### Hidden-property FEA transfer study
 
-The feature branch `feat/hidden-property-calibration` adds a two-dataset method. Dataset A trains a mechanics-informed response model over equivalent bending and shear rigidities; Dataset B uses withheld in-plane and transverse-shear stiffness scales. A small subset of B calibrates the two scales, and untouched B geometries evaluate prediction accuracy. The run varies width, laminate thickness, in-plane stiffness, and transverse shear stiffness; it records $D_{\mathrm{eff}}$, $S_{\mathrm{eff}}$, $EI$, $kGA$, mass, tip displacement, and compliance. See [`docs/property_transfer_study.md`](docs/property_transfer_study.md) and run it with `python src/run_property_transfer_study.py --stage all` on an Ansys/MAPDL machine.
+The feature branch `feat/hidden-property-calibration` adds a hidden-property transfer workflow. Dataset A uses a four-dimensional linearly spaced tensor grid over width, thickness, in-plane stiffness, and transverse-shear stiffness; a target stiffness-scale pair is excluded from training. Dataset B evaluates that pair on geometries inside and outside Dataset A's width/thickness bounds. One calibration observation estimates one common stiffness correction, then interpolation and extrapolation cases are scored separately. It cannot identify independent in-plane and shear scales from one response. The default run performs 72 Dataset A training analyses and 25 Dataset B analyses. See [`docs/property_transfer_study.md`](docs/property_transfer_study.md) and run `python src/run_property_transfer_study.py --stage all` on an Ansys/MAPDL machine.
 
 ### Fit and calibrate the quadratic model
 

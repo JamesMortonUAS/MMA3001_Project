@@ -47,6 +47,10 @@ python src/run_mesh_convergence.py `
 
 This requires the local licensed MAPDL installation. Outputs are a CSV and a compliance-versus-element-count PNG. A practical convergence criterion is a change below 1% between the two finest levels for all three geometries; if that is not met, add a finer level. Record the solver release and inspect the MAPDL output before treating a converged displacement as evidence that the element formulation and boundary conditions are appropriate.
 
+### Hidden-property FEA transfer study
+
+The feature branch `feat/hidden-property-calibration` adds a two-dataset method. Dataset A trains a mechanics-informed response model over equivalent bending and shear rigidities; Dataset B uses withheld in-plane and transverse-shear stiffness scales. A small subset of B calibrates the two scales, and untouched B geometries evaluate prediction accuracy. The run varies width, laminate thickness, in-plane stiffness, and transverse shear stiffness; it records $D_{\mathrm{eff}}$, $S_{\mathrm{eff}}$, $EI$, $kGA$, mass, tip displacement, and compliance. See [`docs/property_transfer_study.md`](docs/property_transfer_study.md) and run it with `python src/run_property_transfer_study.py --stage all` on an Ansys/MAPDL machine.
+
 ### Fit and calibrate the quadratic model
 
 ```powershell

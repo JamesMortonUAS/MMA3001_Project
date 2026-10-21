@@ -1,0 +1,67 @@
+{
+  "method": "Dataset A mechanics-informed regression; Dataset B least-squares calibration of in-plane and transverse-shear stiffness scales",
+  "data_a": "results\\property_transfer\\dataset_A.csv",
+  "data_b": "results\\property_transfer\\dataset_B.csv",
+  "n_dataset_a": 120,
+  "n_dataset_b": 12,
+  "n_calibration": 4,
+  "calibration_case_ids": [
+    4,
+    11,
+    9,
+    2
+  ],
+  "validation_case_ids": [
+    0,
+    1,
+    3,
+    5,
+    6,
+    7,
+    8,
+    10
+  ],
+  "model_features": [
+    "bending_compliance_basis_m_per_N",
+    "shear_compliance_basis_m_per_N"
+  ],
+  "surrogate_dataset_a_5fold_cv": {
+    "n": 120,
+    "rmse_m_per_N": 3.4522451152878236e-07,
+    "mae_m_per_N": 2.547659958753606e-07,
+    "mape_percent": 0.03571524243125266,
+    "max_ape_percent": 0.08562887528685131,
+    "r2": 0.99999951477772
+  },
+  "nominal_scales": {
+    "in_plane_stiffness_scale": 1.0,
+    "transverse_shear_stiffness_scale": 1.0
+  },
+  "fitted_scales": {
+    "in_plane_stiffness_scale": 0.9006651692287062,
+    "transverse_shear_stiffness_scale": 0.7409149095483032
+  },
+  "hidden_target_scales_for_post_fit_audit": {
+    "description": "Hidden target FEA material scales; excluded from calibration fitting.",
+    "in_plane_stiffness_scale": 0.9,
+    "transverse_shear_stiffness_scale": 1.15
+  },
+  "calibration_relative_residual_sse": 5.804435189671498e-07,
+  "nominal_dataset_b_holdout": {
+    "n": 8,
+    "rmse_m_per_N": 0.00012841134510822627,
+    "mae_m_per_N": 0.00010218022218107128,
+    "mape_percent": 9.973175541480888,
+    "max_ape_percent": 10.015795154332126,
+    "r2": 0.972651307417427
+  },
+  "calibrated_dataset_b_holdout": {
+    "n": 8,
+    "rmse_m_per_N": 8.644510354141554e-07,
+    "mae_m_per_N": 5.521570924296449e-07,
+    "mape_percent": 0.04082149397382819,
+    "max_ape_percent": 0.08144181652749441,
+    "r2": 0.9999987606026116
+  },
+  "interpretation": "B calibration cases are used only to fit the two material scales. B holdouts are excluded from surrogate fitting and scale fitting. Both datasets are FEA; this tests transfer between FEA property settings, not physical accuracy."
+}

@@ -1,0 +1,5 @@
+{
+  "description": "Hidden target FEA material scales; excluded from calibration fitting.",
+  "in_plane_stiffness_scale": 0.9,
+  "transverse_shear_stiffness_scale": 1.15
+}

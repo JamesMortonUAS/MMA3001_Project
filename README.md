@@ -1,113 +1,49 @@
 # MMA3001 Landing Gear Optimisation
 
-This repository demonstrates a reproducible workflow for fitting a response model to PyAnsys finite-element results, correcting that model with a small number of known reference observations, and checking interpolation on held-out cases. The benchmark is a straight, linearly width-tapered, 20-ply composite cantilever. It is intended to validate the modelling method before applying it to a curved leaf-spring landing gear.
+This repository develops a reproducible FEA-to-model workflow for estimating the response of a composite beam when observations are limited. The current study trains a mechanics-informed response model on one PyAnsys MAPDL dataset, calibrates one shared effective-stiffness scale from one response in a second dataset, then evaluates predictions on held-out interpolation and extrapolation cases.
 
-## Current workflow
+The benchmark is a straight, prismatic, 20-ply composite cantilever. It is a method demonstration, not a model of the curved landing-gear leg. No physical test data are used, and the new hidden-property sweep has not yet been run. The report therefore documents the current method and planned evaluation; it does not claim a calibration accuracy result.
 
-The current input is [`config.quadratic.example.json`](config.quadratic.example.json). It sets a 10 N transverse tip load and sweeps five factors: beam length, root width, taper ratio, total laminate thickness, and a shared effective laminate stiffness scale. For every design, the runner also records the derived laminate bending stiffness $D_{\mathrm{eff}}$ and transverse shear stiffness $S_{\mathrm{eff}}$.
+## Finite-element model
 
-The default 120-case Latin-hypercube design supports a full degree-two response surface in five inputs (21 coefficients) with cases remaining for a held-out evaluation. Thickness scaling changes every cured ply thickness and therefore total thickness and mass. The stiffness scale multiplies ply elastic and shear moduli while keeping Poisson ratios and density fixed; it provides a controlled range of effective section properties for this methods benchmark.
+- Flat layered-shell mesh using SHELL181; this is a 2D shell discretization with explicit layered section data, not a 3D solid model.
+- Beam length 0.25 m, constant width per case, 40 elements along the beam and 6 across the width.
+- Twenty alternating zero-degree plies: ten 200 gsm carbon 2x2 twill and ten 100 gsm UD E-glass/epoxy. Nominal cured ply thicknesses are 0.20 mm and 0.15 mm, for 3.50 mm total.
+- Three through-thickness integration points per ply. Representative orthotropic material cards are in `layup.json`; values are assumptions rather than measured project material properties.
+- Linear static analysis; root edge fixed in all degrees of freedom. Total 10 N global negative-Z force distributed evenly over the free tip edge. Output is mean tip-edge vertical displacement and compliance `abs(delta)/P`.
 
-### Run the PyAnsys sweep
+The default mesh has not been shown to be converged for the hidden-property study. Record MAPDL/PyMAPDL versions and solver logs, and check mesh sensitivity, shell orientation, load/support implementation, and `abs(delta)/L` before interpreting results.
 
-Install Python 3.10–3.13, the project requirements, `ansys-mapdl-core`, and a licensed local Ansys MAPDL release. For Windows PowerShell:
+## Dataset design
 
-```powershell
-py -3.11 -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-pip install -r requirements.txt
-pip install ansys-mapdl-core
-```
+**Dataset A** is a 4D, three-level equally spaced tensor grid over width (0.03, 0.05, 0.07 m), thickness scale (0.7, 1.0, 1.3), in-plane stiffness scale (0.7, 0.9, 1.1), and transverse-shear stiffness scale (0.7, 1.15, 1.6). It would contain 81 cases. The target property pair `(0.9, 1.15)` is removed for all nine width/thickness combinations, leaving **72 FEA cases for training**.
 
-Run the 120-case layered-shell sweep:
+**Dataset B** uses that withheld property pair and a 5x5 grid: widths 0.025, 0.0375, 0.05, 0.0625, 0.075 m and thickness scales 0.6, 0.8, 1.0, 1.2, 1.4. This gives **25 FEA cases**. The central case (ID 12; width 0.05 m, thickness scale 1.0) is used for the single calibration observation. Of the remaining 24, 8 lie inside both Dataset A geometry bounds (interpolation) and 16 lie beyond at least one bound (extrapolation). Here “withheld laminate” means a withheld pair of effective property scales applied to the same fixed stack; it is not a new stacking sequence.
 
-```powershell
-python src/run_laminate_shell_sweep.py `
-  --config config.quadratic.example.json `
-  --layup layup.json `
-  --output results/quadratic_sweep.csv `
-  --nx 40 `
-  --ny 6
-```
+The configured complete run requires 97 MAPDL analyses (72 in A plus 25 in B). A regular tensor grid gives transparent, deterministic factor coverage and makes withholding the whole property pair explicit. Three levels per axis limit cost but provide only modest resolution of curvature and interactions.
 
-The model uses SHELL181, 20 explicit plies, three through-thickness integration points per ply, a clamped root, and an evenly distributed 10 N transverse force on the tip edge. `--nx` and `--ny` are mesh divisions along the beam and across its width. The current benchmark length is 0.25 m, so the DOE spans 0.20–0.30 m.
+## Model, calibration, and evaluation
 
-### Run a mesh-convergence study
+The code computes laminate effective bending rigidity per unit width `D_eff` from the full Classical Lamination Theory ABD matrix and transverse-shear rigidity `S_eff = sum(G_xz,k * t_k)`. Width and the shear correction factor give beam rigidities `EI = b * D_eff` and `kGA = kappa * b * S_eff`, where `kappa = 5/6`. For each Dataset A case the regression inputs are `L^3/(3 EI)` and `L/(kGA)`. The fitted model is a non-negative, no-intercept least-squares combination of those bending and shear compliance terms. Five-fold cross-validation on A checks within-grid predictive performance.
 
-The convergence runner analyzes three geometries (baseline, narrow/high-taper, and wide/low-taper) at the same 0.25 m length, 10 N load, nominal laminate thickness, and nominal material stiffness. It refines both mesh directions together and reports compliance change between successive levels and relative to the finest mesh. It also compares each FEA result with the analytical benchmark; that comparison is a model-form check, while convergence is assessed from FEA mesh-to-mesh changes.
+One Dataset B compliance observation estimates one bounded common stiffness multiplier (0.65 to 1.35) applied to both in-plane and transverse-shear moduli. The code selects the central case first. The correction minimizes squared relative residual at that observation. A single scalar response cannot identify independent bending and shear corrections, so the fitted value is a response-equivalent correction, not recovery of both hidden scales.
+
+The calibration case is excluded from validation. Nominal and calibrated predictions are compared against the remaining Dataset B FEA values, separately for interpolation and extrapolation, using RMSE, MAE, MAPE, maximum absolute percentage error, and R-squared where defined. Dataset B hidden scales are retained for post-fit audit, but not used by calibration. Since both datasets use the same FEA setup, this validates the workflow under controlled simulation conditions; it does not establish physical validity or transfer to curved gear geometry.
+
+## Run the study
+
+Requires Python project dependencies, PyMAPDL, and a licensed MAPDL installation. From the repository root in PowerShell:
 
 ```powershell
-python src/run_mesh_convergence.py `
-  --config config.quadratic.example.json `
-  --layup layup.json `
-  --output results/mesh_convergence_0p25m.csv `
-  --meshes 20x3 40x6 80x12 160x24
+python src/run_property_transfer_study.py --stage all `
+  --config config.hidden_property.example.json `
+  --layup layup.json
 ```
 
-This requires the local licensed MAPDL installation. Outputs are a CSV and a compliance-versus-element-count PNG. A practical convergence criterion is a change below 1% between the two finest levels for all three geometries; if that is not met, add a finer level. Record the solver release and inspect the MAPDL output before treating a converged displacement as evidence that the element formulation and boundary conditions are appropriate.
+Stages can be run separately with `--stage dataset-a`, `--stage dataset-b`, or `--stage calibrate`. Calibration uses saved CSVs and does not launch MAPDL. Outputs are written to `results/property_transfer_grid/`; the model, predictions, and metrics go under its `model/` directory. Do not report new calibration or validation metrics until this grid run is completed and its solver provenance recorded.
 
-### Hidden-property FEA transfer study
+See [`latex/project_report.pdf`](latex/project_report.pdf) for the full method and current status, [`docs/property_transfer_study.md`](docs/property_transfer_study.md) for the run protocol, and [`docs/requirements_traceability.md`](docs/requirements_traceability.md) for assignment requirements and remaining work.
 
-The feature branch `feat/hidden-property-calibration` adds a hidden-property transfer workflow. Dataset A uses a four-dimensional linearly spaced tensor grid over width, thickness, in-plane stiffness, and transverse-shear stiffness; a target stiffness-scale pair is excluded from training. Dataset B evaluates that pair on geometries inside and outside Dataset A's width/thickness bounds. One calibration observation estimates one common stiffness correction, then interpolation and extrapolation cases are scored separately. It cannot identify independent in-plane and shear scales from one response. The default run performs 72 Dataset A training analyses and 25 Dataset B analyses. See [`docs/property_transfer_study.md`](docs/property_transfer_study.md) and run `python src/run_property_transfer_study.py --stage all` on an Ansys/MAPDL machine.
+## Historical and complementary work
 
-### Fit and calibrate the quadratic model
-
-```powershell
-python src/fit_corrected_surrogate.py `
-  --input results/quadratic_sweep.csv `
-  --config config.quadratic.example.json `
-  --output-dir results/quadratic_model
-```
-
-The model fits a full quadratic response surface to FEA compliance $C=|\delta|/P$. Calibration directly estimates one effective stiffness scale by bounded least squares against analytical observations. The default uses one calibration geometry, the mathematical minimum for one scalar parameter, and holds thickness at its nominal scale. The 20% test set is excluded from fitting and calibration. It tests predictions at unseen geometries while keeping thickness and effective stiffness fixed, which specifically tests geometry transfer. Set `model.calibration_points` higher to fit the same scalar using multiple analytical observations.
-
-The fitted scale multiplies all ply elastic and shear moduli, so the corresponding laminate bending stiffness $D_{\mathrm{eff}}$ and transverse shear stiffness $S_{\mathrm{eff}}$ change together. This single-parameter model does not identify separate bending and shear stiffness corrections. The config sets the initial scale and the scale used to generate the analytical reference; both are 1.0 for the nominal benchmark. For future physical calibration, the reference scale is replaced by measured responses, not treated as a known physical value.
-
-### Test sensitivity to calibration observations
-
-Use the existing sweep to compare 1, 2, 3, and 5 analytical calibration observations without rerunning MAPDL:
-
-```powershell
-python src/analyze_calibration_sensitivity.py `
-  --input results/quadratic_run_2026-10-17_direct_stiffness_calibration/quadratic_sweep.csv `
-  --config config.quadratic.example.json `
-  --layup layup.json `
-  --output-dir results/calibration_sensitivity_2026-10-17 `
-  --counts 1 2 3 5 `
-  --repetitions 30
-```
-
-The quadratic surface is fitted once using the configured training split. For each calibration count, the script includes one centred/maximin subset and draws the remaining unique subsets from training cases only. All subsets use the same untouched held-out geometries. Outputs include per-subset metrics, summary statistics, metadata, and a plot of error and stiffness-scale sensitivity. The default 30 repetitions means 30 subsets per count, including the centred/maximin selection.
-
-### Outputs and checks
-
-The sweep CSV includes design variables, actual thickness, $D_{\mathrm{eff}}$, $S_{\mathrm{eff}}$, tip deflection, compliance, and mass. Fitting writes `metrics.json`, `test_predictions.csv`, `quadratic_model.joblib`, and a LaTeX results table. Plot held-out predictions with:
-
-```powershell
-python src/plot_results.py `
-  --sweep results/quadratic_sweep.csv `
-  --predictions results/quadratic_model/test_predictions.csv `
-  --output-dir results/quadratic_model/figures
-```
-
-Run the solver-independent checks with `python -m pytest`. These checks do not launch MAPDL.
-
-## Latest calibration results
-
-The latest archived run is [`results/quadratic_run_2026-10-17_direct_stiffness_calibration/`](results/quadratic_run_2026-10-17_direct_stiffness_calibration/). It uses one analytical calibration observation to estimate a shared effective stiffness scale of 0.97609. On 24 held-out geometries, MAPE improved from 5.323% to 5.128%, while RMSE, MAE, and $R^2$ worsened. The calibration therefore has a mixed effect across metrics and requires robustness checks with additional calibration cases and alternate splits. That archived sweep used a 0.5 m baseline length; its maximum deflection-to-length ratio of 0.330 is not representative of the newly shortened 0.25 m benchmark. The updated sweep must be rerun before reporting new response-surface or calibration results.
-
-The earlier compliance-multiplier fit is preserved in [`results/quadratic_run_2026-10-17_one_point_calibration/`](results/quadratic_run_2026-10-17_one_point_calibration/) for comparison. That correction increased held-out MAPE from 5.95% to 7.27%.
-
-## Assumptions and limits
-
-- Static linear elasticity and small-deflection beam theory are used. Confirm the 10 N response is within the linear small-deflection range for every design; the applied load alone does not guarantee that.
-- The beam is straight, linearly width-tapered, clamped at the root, and loaded transversely at the tip. The model does not include geometric nonlinearity, contact, damage, failure, or impact dynamics.
-- Material cards are representative numerical inputs for demonstrating the workflow, not measured properties of the project’s composite.
-- The stack is unsymmetric, and the CLT effective bending calculation retains extension–bending coupling. The shear term uses the laminate through-thickness $G_{xz}t$ sum and the configured correction factor.
-- The analytical equation is the ground truth for this benchmark only. It is not a physical test result and is not an exact solution for a curved landing-gear leg.
-- The default DOE has five inputs. Quadratic interpolation is assessed within the sampled domain; extrapolation requires a separate, deliberately held-out region.
-
-## Repository contents
-
-`layup.json` defines the 20-ply material sequence and input properties. `src/` contains the PyMAPDL sweep, laminate section setup, analytical reference, quadratic fit, calibration sensitivity analysis, plotting, and mass optimization tools. `latex/` contains report material; `docs/requirements_traceability.md` tracks the brief. Archived results distinguish the original 100 N exploratory run, the preliminary one-point compliance correction, the direct-stiffness calibration, and the calibration-observation sensitivity analysis.
+Earlier quadratic-surrogate, analytical-reference, mesh-convergence, and calibration studies are preserved under `results/`. They used different configurations and are not results from the current 97-case hidden-property grid. The prior analytical and mesh work can inform separate method checks, but its performance metrics must not be substituted for the pending Dataset A/Dataset B evaluation.

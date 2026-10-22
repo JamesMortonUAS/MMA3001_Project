@@ -1,0 +1,5 @@
+{
+  "description": "Hidden Dataset B material scales; post-fit audit only.",
+  "in_plane_stiffness_scale": 0.9,
+  "transverse_shear_stiffness_scale": 1.15
+}

@@ -72,7 +72,7 @@ python src/run_extended_transfer_study.py --stage fit
 
 Or run the entire sequence with `--stage all`. If a simulation run stops, the FEA stages read completed case IDs from their CSV and skip those cases when resumed. Keep the config and solver logs with the output. To change output location, pass `--output-dir results/my_run`.
 
-The runner requires `laminate_section.py` from the repository's `src/` directory for its effective bending/shear calculation. The archived baseline `run_property_transfer_study.py` is not invoked.
+The runner requires `laminate_section.py` from the repository's `src/` directory for its effective bending/shear calculation. The archived baseline `run_property_transfer_study.py` is not invoked. To smoke-test MAPDL before a full run, use `--stage dataset-a --max-cases 1`; the same option works for `--stage targets`. Then rerun that stage without `--max-cases` to finish the remaining cases. Do not use `--max-cases` with `--stage all`, because model fitting requires the complete datasets.
 
 Outputs under `results/property_transfer_extended/`:
 

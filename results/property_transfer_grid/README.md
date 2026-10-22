@@ -33,7 +33,7 @@ The calibrated RMSE fell by approximately 99.23% overall. Absolute errors are re
 
 The “extrapolation” result is limited to the tested rectangular domain: width 0.025–0.075 m and thickness scale 0.6–1.4, versus Dataset A bounds 0.03–0.07 m and 0.7–1.3. Sixteen points lie outside at least one bound. It does not support arbitrary extrapolation to other geometry, length, layup, boundary conditions, load regime, or curvature.
 
-![Held-out parity and residuals](grid_sweep_validation.png)
+![Held-out parity and residuals](grid_sweep_validation.svg)
 
 ## Interpretation and limitations
 

@@ -1,0 +1,84 @@
+{
+  "beam": {
+    "length_m": 0.25,
+    "tip_load_N": 10.0,
+    "shear_correction_factor": 0.8333333333333334
+  },
+  "mesh": {
+    "nx": 40,
+    "ny": 6,
+    "integration_points_per_ply": 3,
+    "nproc": 2
+  },
+  "dataset_a": {
+    "widths_m": [0.02, 0.04, 0.06, 0.08, 0.10],
+    "ply_counts": [8, 16, 24, 32],
+    "stiffness_scale_pairs": [[1.0, 1.0], [1.0, 2.0], [2.0, 1.0], [2.0, 2.0]]
+  },
+  "targets": {
+    "material_interpolation": {"kind": "tw_glass", "carbon_scale": 1.5, "glass_scale": 1.5},
+    "material_extrapolation": {"kind": "tw_glass", "carbon_scale": 2.25, "glass_scale": 0.75},
+    "layup_transfer": {"kind": "ud_tw_glass", "carbon_scale": 1.0, "glass_scale": 1.0},
+    "geometry_extrapolation": {
+      "kind": "tw_glass",
+      "carbon_scale": 1.0,
+      "glass_scale": 1.0,
+      "widths_m": [0.015, 0.04, 0.06, 0.08, 0.15],
+      "ply_counts": [8, 16, 32, 100]
+    }
+  },
+  "calibration": {
+    "repeats": 3,
+    "points_per_repeat": 2,
+    "seed": 93017,
+    "material_scale_bounds": [0.4, 3.0]
+  },
+  "models": {
+    "quadratic_ridge_alpha": 1e-8,
+    "gp_restarts": 2
+  },
+  "materials": {
+    "CF_TWILL": {
+      "ply_thickness_m": 0.0002,
+      "EX_Pa": 60600000000.0,
+      "EY_Pa": 61600000000.0,
+      "EZ_Pa": 8300000000.0,
+      "PRXY": 0.1,
+      "PRYZ": 0.35,
+      "PRXZ": 0.1,
+      "GXY_Pa": 5000000000.0,
+      "GYZ_Pa": 3000000000.0,
+      "GXZ_Pa": 3000000000.0,
+      "density_kg_m3": 1724.0,
+      "family": "carbon"
+    },
+    "GF": {
+      "ply_thickness_m": 0.0001,
+      "EX_Pa": 38600000000.0,
+      "EY_Pa": 8270000000.0,
+      "EZ_Pa": 8270000000.0,
+      "PRXY": 0.26,
+      "PRYZ": 0.3,
+      "PRXZ": 0.26,
+      "GXY_Pa": 4140000000.0,
+      "GYZ_Pa": 3180000000.0,
+      "GXZ_Pa": 4140000000.0,
+      "density_kg_m3": 1111.0,
+      "family": "glass"
+    },
+    "CF_UD": {
+      "ply_thickness_m": 0.0002,
+      "EX_Pa": 135000000000.0,
+      "EY_Pa": 8500000000.0,
+      "EZ_Pa": 8500000000.0,
+      "PRXY": 0.30,
+      "PRYZ": 0.40,
+      "PRXZ": 0.30,
+      "GXY_Pa": 5000000000.0,
+      "GYZ_Pa": 3000000000.0,
+      "GXZ_Pa": 5000000000.0,
+      "density_kg_m3": 1600.0,
+      "family": "carbon"
+    }
+  }
+}

@@ -251,7 +251,7 @@ def solve_shell_case(mapdl, cfg: dict, row: dict) -> dict:
 
 
 def run_fea(cfg: dict, design: pd.DataFrame, output: Path,
-            dataset: str) -> None:
+            dataset: str, max_cases: int | None = None) -> None:
     """Run/resume a dataset and persist each completed case immediately."""
     from ansys.mapdl.core import launch_mapdl
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -262,7 +262,8 @@ def run_fea(cfg: dict, design: pd.DataFrame, output: Path,
             done = {int(r["case_id"]): r for r in prior.to_dict(orient="records")}
     mapdl = launch_mapdl(nproc=int(cfg["mesh"].get("nproc", 2)))
     try:
-        for row in design.to_dict(orient="records"):
+        run_design = design if max_cases is None else design.head(max_cases)
+        for row in run_design.to_dict(orient="records"):
             cid = int(row["case_id"])
             if cid in done:
                 continue
@@ -466,9 +467,13 @@ def main() -> None:
     parser.add_argument("--config", default="config.extended_transfer.example.json")
     parser.add_argument("--output-dir", default=str(BASE_DIR))
     parser.add_argument("--stage", choices=("design", "dataset-a", "targets", "fit", "all"), default="all")
+    parser.add_argument("--max-cases", type=int, default=None,
+                        help="Run only the first N cases for the selected FEA stage (smoke test).")
     args = parser.parse_args()
     cfg = json.loads(Path(args.config).read_text())
     validate_config(cfg)
+    if args.max_cases is not None and args.max_cases < 1:
+        parser.error("--max-cases must be at least 1")
     out = Path(args.output_dir)
     a_design, target_design = make_designs(cfg)
     a_design_path = out / "dataset_A_design.csv"
@@ -479,9 +484,9 @@ def main() -> None:
         target_design.to_csv(target_design_path, index=False)
         print(f"Wrote Dataset A design ({len(a_design)} cases), target design ({len(target_design)} cases).")
     if args.stage in ("dataset-a", "all"):
-        run_fea(cfg, a_design, out / "dataset_A.csv", "Dataset A")
+        run_fea(cfg, a_design, out / "dataset_A.csv", "Dataset A", args.max_cases)
     if args.stage in ("targets", "all"):
-        run_fea(cfg, target_design, out / "targets.csv", "Targets")
+        run_fea(cfg, target_design, out / "targets.csv", "Targets", args.max_cases)
     if args.stage in ("fit", "all"):
         result = fit_evaluate(cfg, out / "dataset_A.csv", out / "targets.csv", out / "model")
         print(json.dumps(result, indent=2))

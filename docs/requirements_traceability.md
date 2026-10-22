@@ -1,27 +1,22 @@
 # Project brief traceability
 
-This table maps the MMA3001 2026 project brief to the current repository state.
-“In progress” means the repository contains a draft or initial evidence that
-still needs student review or additional engineering work before submission.
+This table maps the MMA3001 project brief to the current hidden-property FEA transfer study. “In progress” means the repository contains a method or draft, but further analysis or student review is still required.
 
 | Brief requirement | Repository evidence | Status / remaining action |
 |---|---|---|
-| Define a self-selected engineering problem and its scope | `README.md`; `latex/project_report.tex` | Drafted. Confirm coordinator approval for the chosen project scope and record the decision. |
-| Define inputs, outputs, units, valid domains, and invalid cases | `config.quadratic.example.json`; `layup.json`; report Section 3 | Five-dimensional SI design domain specified. Review engineering bounds and confirm small-deflection validity after FEA. |
-| Implement and explain a computational method | `src/`; generated HTML in `docs/api/` | Scripts and API documentation included. Verify locally against the intended MAPDL installation. |
-| Compare with a credible alternative or baseline | `src/fit_corrected_surrogate.py`; generated held-out metrics | The quadratic response surface is the selected model. New 10 N FEA metrics are pending. |
-| Validate the method and report metrics and limits | `latex/project_report.tex`; `docs/test_report.md`; generated metrics and predictions | Direct least-squares estimation of one effective stiffness scale and fixed-section geometry-transfer evaluation are implemented. Run the new sweep and assess small-deflection validity. |
-| Analyse optimisation / performance and profile computation where relevant | `src/optimize_mass.py`; report Section 7 | Optimisation code is available but no final optimal design is claimed. Runtime profiling and a design requirement are still needed. |
-| Provide functional source code, comments, and documentation | `src/`; `docs/api/`; docstrings | Included; student should inspect generated documentation and scripts. |
-| Provide test functions and a test report | `tests/test_laminate_section.py`; `docs/test_report.md`; GitHub Actions workflow | 3 local pytest checks pass; CI also runs pytest. Tests do not launch MAPDL. |
-| Provide a licensing agreement | `LICENSE` | MIT license added for original project code and docs. Third-party materials and solver outputs are excluded from that grant. |
-| Submit written project documentation within the brief's length limit | `latex/project_report.tex` | Draft targets 5–10 pages after compilation. Review pagination, references, and all bracketed student actions. |
-| Disclose AI use and reflect on it | Report Section 9 | Disclosure scaffold is included. Student must add a personal reflection based on their actual use and verify all technical claims. |
-| Prepare a short presentation and answer questions | Project brief; report and repository evidence | Not yet prepared. Build a 5-minute presentation with validation, decisions, limitations, AI use, and GitHub demonstration. |
+| Define the engineering problem and scope | `README.md`; `latex/project_report.tex` | Benchmark and limits are defined. Confirm coordinator approval of the chosen scope and record the decision. |
+| Define inputs, outputs, units, and valid domain | `config.hidden_property.example.json`; `layup.json`; report Sections 2–4 | SI parameters and 97-case study design are specified. Check the engineering relevance of bounds and assess small-deflection assumptions after running FEA. |
+| Implement and explain a computational method | `src/run_property_transfer_study.py`; `src/run_laminate_shell_sweep.py`; `src/laminate_section.py`; `docs/property_transfer_study.md` | Scripts implement the regular-grid FEA generation, section-property regression, one-point common-scale calibration, and regional validation workflow. Verify locally with the intended MAPDL installation. |
+| Compare against a baseline or reference | `src/run_property_transfer_study.py` | Dataset A five-fold cross-validation and nominal-vs-calibrated predictions are specified. Generate Dataset A/B and report actual metrics; no current grid results are committed. |
+| Validate and state limitations | `latex/project_report.tex`; `docs/test_report.md` | Validation protocol separates interpolation and extrapolation; this is FEA-to-FEA only. Run the sweep, examine mesh sensitivity and `abs(delta)/L`, and do not claim physical validation. |
+| Analyse performance or optimisation | `src/optimize_mass.py`; report scope | Optimisation code is supplementary. No mass-optimal design is claimed by the hidden-property transfer experiment; define requirements and verify the predictor first. |
+| Provide functional source and documentation | `src/`; `docs/`; `README.md` | Included. Student should inspect scripts, API documentation, and local results. |
+| Provide tests and test evidence | `tests/`; `docs/test_report.md`; `.github/workflows/` | Solver-independent tests do not launch MAPDL. Run them and retain the current test report. |
+| Provide licensing | `LICENSE` | MIT license covers original project material as stated in the file; check third-party material and solver-output provenance separately. |
+| Provide written project documentation | `latex/project_report.tex`; compiled `latex/project_report.pdf` | Updated method draft is six pages before adding current FEA results. Recheck length and pagination after results are added. |
+| Disclose AI use and reflect | Report Section 8 | Use disclosure is included; student should add a personal reflection on assistance, verification, and decisions. |
+| Prepare and present the project | Project brief; report and repository | Prepare a short presentation with problem, model, data design, calibration, evaluation, limitations, and evidence from the completed run. |
 
 ## Evidence boundary
 
-The archived 100 N sweep is historical exploratory evidence and is not used as
-validation for the current 10 N configuration. The new PyAnsys sweep has not
-yet been run, so no new FEA metrics or solver provenance are available. No
-physical test data are part of this project.
+The configured current workflow contains 72 Dataset A training analyses and 25 Dataset B analyses. The current hidden-property grid has not yet been run in the repository, so no fitted correction or validation metrics are available. Earlier studies in `results/` used different setups and should remain identified as historical or complementary. No physical test data are included.

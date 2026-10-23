@@ -1,186 +1,214 @@
 \documentclass[11pt]{article}
+\usepackage[T1]{fontenc}
 \usepackage[margin=2cm]{geometry}
 \usepackage{amsmath,amssymb}
-\usepackage{booktabs}
-\usepackage{graphicx}
-\usepackage{tabularx}
-\usepackage{array}
+\usepackage{booktabs,tabularx,array}
 \usepackage[hidelinks]{hyperref}
-\usepackage{microtype}
-
-\title{MMA3001 Project\\\large FEA Surrogate Modelling and Hidden-Property Calibration for a Composite Beam}
+\usepackage{graphicx}
+\usepackage{enumitem}
+\setlist{nosep,leftmargin=*}
+\newcommand{\MAPE}{\mathrm{MAPE}}
+\newcommand{\Dref}{D_{\mathrm{eff}}}
+\newcommand{\Sref}{S_{\mathrm{eff}}}
+\title{MMA3001 Project\\\large Limited-Observation Calibration of Composite Beam Compliance Models}
 \author{James Morton -- 33853967}
-\date{Project status: hidden-property grid completed; results and limits reported}
-
+\date{23 October 2026}
 \begin{document}
 \maketitle
 
 \begin{abstract}
-This project develops a reproducible workflow for fitting an FEA-based response model, correcting it with a limited number of target observations, and predicting unobserved responses. Dataset A contains 72 PyAnsys MAPDL simulations on a regular grid of beam width, laminate thickness, and two effective material-property scales. Dataset B contains 25 simulations at a withheld property pair, with one central response used to calibrate a common stiffness correction and 24 held-out geometries used for evaluation. The calibrated model reduced held-out MAPE from 9.945\% to 0.0539\% overall, with similar errors for interpolation (0.0337\%) and the tested bounded extrapolation region (0.0640\%). Both datasets use the same FEA setup, so this result demonstrates FEA-to-FEA transfer and does not validate physical material properties or a real landing gear. The softest cases also reach $|u|/L=0.234$, limiting physical interpretation under a small-deflection assumption.
+This project demonstrates a workflow for fitting a finite-element-analysis (FEA) response model, calibrating it with a small number of observations, and testing predictions on withheld cases. The latest trial uses PyAnsys MAPDL to generate 80 training cases and 80 target cases for a straight, layered composite cantilever. Three model classes are compared: a mechanics-informed compliance regression, a quadratic response surface, and a Gaussian process. For each of four target sets, two responses calibrate carbon and glass stiffness scale factors; 18 other cases per repeat are held out for validation, with three calibration repeats. The models predict FEA-generated responses well after informative calibration for same-layup material changes. A deliberately uninformative calibration pair shows that two observations do not guarantee identifiable material corrections. The alternate-layup trial used configured material cards as its nominal baseline, so it demonstrates layup transfer with known nominal properties rather than prediction with no material knowledge. The study is FEA-to-FEA only; it does not validate physical material properties or a curved landing-gear leg. Large normalized deflections in some linear-static cases and outstanding mesh verification further limit physical interpretation.
 \end{abstract}
 
-\section{Problem, aim, and scope}
-Repeated physical tests may be costly when developing a response model for a composite landing-gear component. The intended future use is to build an FEA-based predictor, correct systematic response error with a small number of observations of the real component, then estimate responses at untested designs. Physical test data are not included in this project. Instead, a controlled FEA-to-FEA exercise uses one FEA dataset with known modelling inputs as the training source and another FEA dataset with deliberately hidden effective properties as the reference relationship.
+\section{Introduction}
+Composite landing-gear design can require costly physical testing to determine how geometry, layup, and laminate stiffness affect deflection. This project investigates whether a model trained on FEA results can be corrected with only a few observations and used to predict unobserved responses. The long-term motivation is to apply the same workflow to physical test observations when they become available.
 
-The immediate benchmark is a straight, prismatic composite cantilever of fixed length, clamped at one end and loaded transversely at its free end. Width and laminate thickness vary. The stack sequence is fixed. The study tests whether the method can learn a response over one property domain, correct it from one response for a withheld property combination, and predict unseen responses within and beyond the training geometry bounds.
-
-The work does not represent curved undercarriage geometry and does not simulate landing impact, contact, large deflection, damage, failure, rate effects, or dynamic response. The term ``hidden laminate'' refers only to withheld stiffness-scale settings applied to the same 20-ply stack; the ply materials, angles, and sequence are not changed. Results cannot establish the accuracy of the assumed material cards for a physical gear.
+The present trial is a controlled methodology demonstration, not a landing-impact simulation or a mass optimization. It uses a straight cantilever as a tractable benchmark. No physical testing observations are included, and the material cards are numerical assumptions. Consequently, the validation performed here compares model predictions with held-out FEA results generated using the same modeling framework; it does not establish agreement with a manufactured gear.
 
 \section{Finite-element model}
-\subsection{Geometry, element, and laminate}
-The model is a flat shell mesh on the $x$--$y$ plane, with the beam axis along global $+X$, width along global $+Y$, and transverse displacement/load along global $Z$. The planform is rectangular (constant width along the beam); the code sets the taper ratio to one. Beam length is fixed at $L=0.25\,\mathrm{m}$. The mesh is structured with 40 divisions along the length and 6 across the width (240 shell elements before any solver-specific internal treatment). The analysis uses the SHELL181 layered-shell element. It is a two-dimensional shell discretization with a layered through-thickness section, not a three-dimensional solid mesh.
+The beam is a flat rectangular layered shell with fixed length $L=0.25\,\mathrm{m}$. The axis is global $X$, width is global $Y$, and the applied transverse force is global $-Z$. The root edge is fully fixed. A total 10 N load is distributed equally across nodes on the free tip edge. The analysis is linear static.
 
-Each section has 20 explicit, alternating $0^\circ$ plies, ordered bottom-to-top: ten carbon 2$\times$2 twill plies (200 gsm) and ten unidirectional E-glass/epoxy plies (100 gsm). Warp is aligned with the beam axis. Nominal cured thickness is 0.20 mm for each carbon ply and 0.15 mm for each glass ply, so the nominal total is 3.50 mm. Three through-thickness integration points are specified per ply. Material cards are orthotropic and include elastic constants, Poisson ratios, shear moduli, and density. Their values are representative modelling inputs assembled from the references recorded in \path{layup.json}; they are not measured properties of manufactured test coupons. Some transverse properties and cured densities use explicit assumptions. The alternating sequence is unsymmetric and may exhibit extension--bending coupling. The material cards use representative orthotropic constants summarized in Table~\ref{tab:material-cards}; the complete card, including all Poisson ratios and transverse shear constants, is in \path{layup.json}. Values are numerical assumptions, not measured project materials.
+The mesh uses SHELL181 layered shell elements, with 40 divisions along the length and 6 across the width. Three through-thickness integration points are assigned per ply. This is a two-dimensional shell discretization with a layered section, not a three-dimensional solid model. All cases use the same mesh.
 
-\begin{table}[htbp]
+Dataset A uses a symmetric twill/glass stack built by repeating carbon twill (T) and glass (G) in the half-stack and mirroring about the mid-plane. Carbon twill plies are 0.20 mm and glass plies are 0.10 mm. Dataset B's alternate-layup set uses a symmetric repeating carbon UD (U), carbon twill (T), and glass (G) half-stack, truncated to the needed half-ply count and mirrored; both carbon ply types are 0.20 mm and glass is 0.10 mm.
+
+\begin{table}[ht]
 \centering
-\footnotesize
-\caption{Principal material-card values used at unit property scale. Moduli are in GPa and density in kg/m$^3$.}
-\label{tab:material-cards}
-\begin{tabular}{lrrrrrrr}
+\caption{Stack thicknesses used in the two layup families.}
+\begin{tabular}{rrrr}
 \toprule
-Material & $E_X$ & $E_Y$ & $E_Z$ & $G_{XY}$ & $G_{XZ}$ & $\nu_{XY}$ & Density \\
+Ply count & Twill/glass total thickness & UD/twill/glass total thickness & Unit \\
 \midrule
-CF 2$\times$2 twill & 60.6 & 61.6 & 8.3 & 5.00 & 3.00 & 0.10 & 1724 \\
-UD E-glass/epoxy & 38.6 & 8.27 & 8.27 & 4.14 & 4.14 & 0.26 & 1111 \\
+8  & 1.2 & 1.4 & mm \\
+16 & 2.4 & 2.8 & mm \\
+24 & 3.6 & 4.0 & mm \\
+32 & 4.8 & 5.4 & mm \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\subsection{Loads, supports, and outputs}
-Each case is a static, linear-elastic analysis under a total 10 N force in global $-Z$. The force is divided equally among nodes on the free tip edge. All degrees of freedom are fixed at the root edge. The response used for modelling is the magnitude of mean vertical displacement at the tip edge, divided by the applied force:
-\begin{equation}
- C=\frac{|\bar{u}_{z,\mathrm{tip}}|}{P},\qquad P=10\,\mathrm{N},
-\end{equation}
-with units of m/N. Using compliance gives a load-normalized measure for this linear analysis. Each case also records geometry and property scales, calculated section properties, total laminate thickness, mass, signed tip displacement, $|\delta|/L$, load, and mesh divisions.
+Orthotropic elastic and shear properties are specified in the example configuration. For the transfer experiment, a carbon factor scales the elastic and shear moduli of carbon plies, and a glass factor scales those of glass plies; density, Poisson ratios, and ply thickness do not change when these factors vary. The cards and cured ply values are computational assumptions, not measured project material properties.
 
-The model is implemented in \path{src/run_laminate_shell_sweep.py} and \path{src/laminate_section.py}; the study driver is \path{src/run_property_transfer_study.py}. A licensed local MAPDL installation is required for the FEA stages. The solver version, PyMAPDL version, solver output, and run-specific configuration must be retained when the sweep is run. The current 40$\times$6 mesh has not been demonstrated to be mesh-converged for this hidden-property study. The separate convergence workflow should be used as supporting numerical evidence, with its setup and results reported separately.
-
-\section{Effective section properties and response model}
-The 20-ply material cards are used to calculate equivalent laminate bending and transverse-shear stiffnesses. Classical Lamination Theory assembles the $A$, $B$, and $D$ matrices from the in-plane ply stiffnesses. The effective bending rigidity per unit width, $D_{\mathrm{eff}}$, is obtained from the inverse of the full $ABD$ matrix with zero membrane resultants and zero non-$x$ bending moments; this retains the unsymmetric stack's extension--bending coupling under the stated assumptions. The approximate beamwise transverse-shear rigidity per unit width is
+The response is tip compliance,
 \begin{equation}
- S_{\mathrm{eff}}=\sum_k G_{xz,k}t_k.
+ C=\frac{|\bar{u}_{z,\mathrm{tip}}|}{P},
 \end{equation}
-For width $b$, the effective beam rigidities are $EI=bD_{\mathrm{eff}}$ and $kGA=\kappa bS_{\mathrm{eff}}$, with $\kappa=5/6$. These section properties give interpretable predictors and let the training and target configurations be compared through bending and shear contributions.
+where $\bar{u}_{z,\mathrm{tip}}$ is the mean vertical tip-edge displacement and $P=10\,\mathrm{N}$. Compliance has units of m/N and is load-normalized for the linear-static analyses. The case files also record effective section properties, mass, ply sequence, thickness, signed deflection, and $|\delta|/L$.
 
-For each Dataset A case the mechanics basis is
-\begin{equation}
- x_b=\frac{L^3}{3EI},\qquad x_s=\frac{L}{kGA}.
-\end{equation}
-The fitted model is a non-negative, no-intercept linear regression in these two basis terms:
-\begin{equation}
- \widehat{C}=c_bx_b+c_sx_s,\qquad c_b\geq0,\quad c_s\geq0.
-\end{equation}
-The coefficients $c_b$ and $c_s$ are estimated by least squares from Dataset A FEA compliance values. This is a mechanics-informed response surface: it varies smoothly with effective section properties while retaining separate bending and shear contributions. It has two fitted coefficients and uses all Dataset A cases, rather than fitting a high-order polynomial in every raw input. Five-fold shuffled cross-validation on Dataset A is specified to estimate its within-grid predictive performance. The cross-validation score is a model diagnostic; it is not the held-out hidden-property evaluation.
-
-\section{Datasets and design of experiments}
-\subsection{Dataset A: training source}
-Dataset A is a full tensor-product grid with three equally spaced levels on each of four axes:
+\section{Experiment design and data}
+\subsection{Dataset A: model training}
+Dataset A contains the full 5 by 4 by 4 factorial design: five widths, four ply counts, and four carbon/glass property-factor combinations. The combinations are $(1,1)$, $(1,2)$, $(2,1)$, and $(2,2)$.
 \begin{itemize}
- \item width $b$: 0.030, 0.050, and 0.070 m;
- \item thickness scale $q_t$: 0.70, 1.00, and 1.30;
- \item in-plane stiffness scale $q_E$: 0.70, 0.90, and 1.10;
- \item transverse-shear stiffness scale $q_G$: 0.70, 1.15, and 1.60.
+\item Widths: 0.02, 0.04, 0.06, 0.08, and 0.10 m.
+\item Ply counts: 8, 16, 24, and 32.
+\item Carbon/glass stiffness factor pairs: $(1,1)$, $(1,2)$, $(2,1)$, and $(2,2)$.
 \end{itemize}
-A complete grid would contain $3^4=81$ cases. The property pair $(q_E,q_G)=(0.90,1.15)$ is withheld in full. It would contribute nine width--thickness combinations, so these cases are excluded before FEA and 72 cases are simulated for training. The grid is used because it gives balanced, deterministic coverage of every factor combination and makes deliberate withholding of a whole property pair auditable. It is not a Gaussian quadrature rule. Three levels per axis keep the initial factorial study manageable, but give limited resolution for curvature and interaction effects.
+This gives 80 FEA responses. The training cases span the base twill/glass stack and the configured carbon/glass stiffness variation.
 
-The in-plane scale multiplies $E_X$, $E_Y$, and $G_{XY}$ in each material card. The transverse-shear scale multiplies $G_{XZ}$ and $G_{YZ}$. Thickness scale multiplies each cured ply thickness. Other properties, including density and Poisson ratios, remain fixed. Thus both section rigidity and mass change with thickness; mass is an output for context, not a model target in this response-transfer exercise. The excluded property pair is called a withheld ``laminate'' setting in the configuration, but is not a different stacking sequence.
-
-\subsection{Dataset B: hidden-property target and test set}
-Dataset B uses the withheld target pair $(q_E,q_G)=(0.90,1.15)$, with a $5\times5$ grid of width and thickness:
-\begin{itemize}
- \item width: 0.025, 0.0375, 0.050, 0.0625, and 0.075 m;
- \item thickness scale: 0.60, 0.80, 1.00, 1.20, and 1.40.
-\end{itemize}
-This produces 25 target FEA cases. A case is labelled interpolation only when both width and thickness lie within Dataset A's bounds. Nine Dataset B points satisfy that condition. The other 16 points extend beyond at least one bound and are labelled extrapolation. The central point (width 0.050 m, thickness scale 1.00; case ID 12) is selected as the single calibration observation. It leaves eight interpolation and sixteen extrapolation cases for validation. Dataset B's hidden property scales are used to create the target FEA, but the calibration reads only the observed compliance at the selected case. The hidden settings are retained separately for a post-fit audit and are not inputs to the calibration objective.
-
-\begin{table}[htbp]
+\subsection{Dataset B: target sets}
+Dataset B contains four 20-case sets (80 cases total). Except for geometry extrapolation, each set uses the Dataset A widths and ply counts.
+\begin{table}[ht]
 \centering
-\caption{Completed FEA design and data partition.}
-\label{tab:datasets}
-\begin{tabularx}{\linewidth}{l r X}
+\small
+\caption{Dataset B target design.}
+\begin{tabularx}{\linewidth}{l X}
 \toprule
-Set / use & Cases & Contents \\
+Target set & Change from Dataset A \\
 \midrule
-Dataset A training & 72 & 3-level grid over width, thickness, and two property scales; the target property pair is excluded. \\
-Dataset B target FEA & 25 & 5$\times$5 width--thickness grid at the withheld property pair. \\
-Calibration & 1 & Central Dataset B response used to fit a common stiffness correction. \\
-Interpolation validation & 8 & Remaining Dataset B points inside both Dataset A geometry bounds. \\
-Extrapolation validation & 16 & Remaining Dataset B points outside at least one Dataset A geometry bound. \\
+Material interpolation & Twill/glass layup; carbon/glass factors $(1.5,1.5)$. \\
+Material extrapolation & Twill/glass layup; factors $(2.25,0.75)$. \\
+Layup transfer & Symmetric UD/twill/glass layup; factors $(1,1)$. \\
+Geometry extrapolation & Twill/glass layup; widths 0.015, 0.04, 0.06, 0.08, 0.15 m and ply counts 8, 16, 32, 100; factors $(1,1)$. \\
 \bottomrule
 \end{tabularx}
 \end{table}
 
-\section{Training, calibration, and evaluation}
-\subsection{Training Model A}
-The mechanics basis $(x_b,x_s)$ is computed for each of the 72 Dataset A cases from its width, thickness, and material-property settings. The regression coefficients are chosen to minimize the sum of squared compliance residuals with non-negative coefficients and no intercept. No Dataset B compliance is used to fit Model A. Five-fold cross-validation is run on Dataset A, shuffling folds with the configured seed, to check that the model can represent responses at unseen points drawn from the same training grid.
+The layup-transfer case is important to interpret correctly. Its FEA targets were generated with the material cards in the configuration at factors $(1,1)$. Those same configured cards and the known alternate ply sequence were used to calculate nominal laminate section properties for prediction. Thus nominal predictions were not made with no material knowledge: this set tests transfer to a different layup using known nominal material cards. During calibration, the model was allowed to adjust the carbon and glass factors around that baseline using only response observations. The configured truth factors were not supplied to the calibration optimizer.
 
-\subsection{One-response calibration}
-A single compliance cannot separately identify a bending-stiffness error and a shear-stiffness error. The study therefore estimates one scalar $s$ and applies it to both in-plane and transverse-shear moduli of the target layup. Starting from $s=1$, the bounded range is $0.65\leq s\leq1.35$. For the central calibration case, the selected $s$ minimizes the squared relative residual:
+\section{Models, calibration, and validation}
+\subsection{Section-property predictors}
+For each case, the effective laminate bending rigidity per unit width $\Dref$ is calculated from the laminate stiffness matrices. The transverse-shear rigidity per unit width is approximated as
 \begin{equation}
- \widehat{s}=\underset{0.65\leq s\leq1.35}{\operatorname{argmin}}
- \sum_{i\in\mathcal{C}}
- \left(\frac{\widehat{C}_{A,i}(s)-C_{B,i}}{C_{B,i}}\right)^2,
- \qquad |\mathcal{C}|=1.
+ \Sref=\sum_k G_{xz,k}t_k.
 \end{equation}
-Here $C_{B,i}$ is the one observed Dataset B FEA compliance. The same $s$ scales bending- and shear-related material moduli, and the section properties and mechanics basis are recomputed at that candidate scale before prediction. This restricted correction is identifiable from one scalar observation; independent $q_E$ and $q_G$ corrections are not. Therefore, a fitted $s$ is a response-equivalent correction, not a recovery of the two hidden properties.
+For a case of width $b$, the bending and corrected shear rigidities are $EI=b\Dref$ and $kGA=\kappa b\Sref$, with $\kappa=5/6$. The mechanical basis terms are
+\begin{equation}
+ x_b=\frac{L^3}{3EI}, \qquad x_s=\frac{L}{kGA}.
+\end{equation}
 
-\subsection{Held-out evaluation and why it is separated}
-Model A and its calibration use no Dataset B validation responses. The calibrated and uncalibrated model predict the remaining 24 cases. Predictions are scored separately for the eight geometry-interpolation cases and sixteen geometry-extrapolation cases using RMSE, MAE, mean absolute percentage error, maximum absolute percentage error, and $R^2$ where defined. The calibration case is excluded from these validation scores. Report the fitted correction and compare the nominal and calibrated errors for each region as well as overall. This split tests two different capabilities: local transfer within the sampled geometric range and prediction beyond its boundary. Extrapolation scores should not be interpreted as evidence for transfer to a curved gear, different support, changing length, or real impact conditions.
+\subsection{Model families}
+Three models are fit to Dataset A only:
+\begin{enumerate}
+\item \textbf{Mechanics-informed compliance regression:} nonnegative, no-intercept least squares in $x_b$ and $x_s$, $\widehat C=\beta_bx_b+\beta_sx_s$.
+\item \textbf{Quadratic response surface:} second-order polynomial in standardized logarithms of width, total thickness, $\Dref$, and $\Sref$, fit to log compliance with ridge regularization.
+\item \textbf{Gaussian process:} Mat\'ern 5/2 kernel plus a white-noise term, using the same log predictors and log compliance.
+\end{enumerate}
+Five-fold cross-validation on Dataset A estimates within-training-domain predictive performance. Target FEA responses are not used to fit or select the Dataset A models.
 
-The workflow uses two simulated datasets to emulate an expensive-observation problem. Because Dataset B is generated by the same FEA code and element setup as Dataset A, the exercise tests design-space coverage, model fitting, parameter correction, and hold-out evaluation under controlled conditions. It does not test FEA model-form discrepancy against physical behaviour. Later work could replace Dataset B observations with physical measurements while keeping the same training, calibration, and evaluation logic, after validating the FEA setup and defining a physical test protocol.
+\subsection{Calibration and held-out validation}
+For each target set, three calibration repeats are performed. A pair of target cases is randomly selected for each repeat; the same pair is used across model families. For each fitted model, nonlinear least squares estimates two multipliers, $q_C$ and $q_G$, by minimizing the squared log-compliance residuals at the selected cases:
+\begin{equation}
+ (q_C^*,q_G^*)=\arg\min_{q_C,q_G}\sum_{i\in\mathcal C}
+ \left[\log\widehat C_i(q_C,q_G)-\log C_{i,\mathrm{FEA}}\right]^2,
+ \qquad |\mathcal C|=2.
+\end{equation}
+Candidate factors are applied to the configured ply material cards, after which $\Dref$, $\Sref$, $EI$, and $kGA$ are recalculated. The trained model coefficients or surrogate surface are held fixed. The compliance observations are the calibration data; calculated section properties are model inputs, not target observations.
 
-\section{Results and interpretation}
-The completed run comprises the planned 72 Dataset A training analyses and 25 Dataset B target analyses. Dataset A is a $3^4$ grid with the entire target material-property pair omitted. Dataset B uses the withheld pair $(q_E,q_G)=(0.90,1.15)$ over a $5\times5$ width--thickness grid. Case 12 (width 0.050 m, thickness scale 1.00) was used as the one-point calibration observation; the other 24 cases form the validation set. Eight validation points lie within both Dataset A geometric bounds, and sixteen lie outside at least one bound.
+The other 18 cases are held out for validation in each repeat. The calibration cases do not appear in the validation metrics. Reported measures include MAPE, maximum absolute percentage error, RMSE, and $R^2$. Calibration fits two unknown factors from the algebraic minimum of two observations, so a poorly chosen pair may produce non-identifiable or unstable factors. Jacobian rank and condition number are recorded.
 
-The Dataset A five-fold cross-validation MAPE was 0.0571\%, with $R^2=0.9999995$. The fitted mechanics coefficients were $c_b=0.99854$ and $c_s=1.28480$ for the bending and shear basis terms. The single common stiffness scale fitted from the Dataset B calibration point was $\widehat{s}=0.90054$. The observed calibration compliance was $6.3181\times10^{-4}$ m/N; nominal Model A underpredicted it by 9.9457\%, and the calibrated prediction matches it by construction.
+\section{Results}
+\subsection{Dataset A cross-validation}
+\begin{table}[ht]
+\centering
+\caption{Five-fold cross-validation scores on Dataset A.}
+\begin{tabular}{lrrr}
+\toprule
+Model & MAPE (\%) & RMSE (m/N) & $R^2$ \\
+\midrule
+Mechanics-informed & 0.1083 & $4.364\times10^{-6}$ & 0.9999994 \\
+Quadratic surface & 0.0053 & $2.797\times10^{-7}$ & 0.999999998 \\
+Gaussian process & 0.0195 & $2.171\times10^{-6}$ & 0.9999999 \\
+\bottomrule
+\end{tabular}
+\end{table}
+The quadratic surface had the lowest cross-validation error over the sampled Dataset A grid. The mechanics-informed model is more directly interpretable, while its error was higher. These results do not themselves establish target-set or physical accuracy.
 
-\begin{table}[htbp]
+\subsection{Target-set held-out performance}
+Table~\ref{tab:targetmetrics} gives the mean MAPE across the three repeats, with standard deviation across repeats. Each MAPE is calculated over that repeat's 18 held-out cases.
+\begin{table}[ht]
 \centering
 \small
-\caption{Held-out Dataset B compliance prediction. The calibration point is excluded.}
-\label{tab:hidden-grid-results}
-\begin{tabular}{llrrrrr}
+\caption{Held-out MAPE before and after calibration, mean $\pm$ standard deviation across repeats.}
+\label{tab:targetmetrics}
+\begin{tabular}{llrr}
 \toprule
-Region & Model & $n$ & RMSE (m/N) & MAE (m/N) & MAPE (\%) & Max APE (\%) \\
+Target set & Model & Nominal MAPE (\%) & Calibrated MAPE (\%) \\
 \midrule
-All validation & Nominal & 24 & $1.864\times10^{-4}$ & $1.272\times10^{-4}$ & 9.9447 & 10.0361 \\
-All validation & Calibrated & 24 & $1.442\times10^{-6}$ & $7.584\times10^{-7}$ & 0.0539 & 0.1065 \\
-Interpolation & Nominal & 8 & $9.069\times10^{-5}$ & $7.915\times10^{-5}$ & 9.9454 & 9.9916 \\
-Interpolation & Calibrated & 8 & $3.591\times10^{-7}$ & $2.709\times10^{-7}$ & 0.0337 & 0.0525 \\
-Extrapolation & Nominal & 16 & $2.191\times10^{-4}$ & $1.513\times10^{-4}$ & 9.9443 & 10.0361 \\
-Extrapolation & Calibrated & 16 & $1.748\times10^{-6}$ & $1.002\times10^{-6}$ & 0.0640 & 0.1065 \\
+Material interpolation & Mechanics-informed & $50.150\pm0.008$ & $0.125\pm0.061$ \\
+ & Quadratic & $50.000\pm0.001$ & $0.006\pm0.001$ \\
+ & Gaussian process & $49.974\pm0.003$ & $0.011\pm0.002$ \\
+\addlinespace
+Material extrapolation & Mechanics-informed & $98.805\pm0.409$ & $1.007\pm1.553$ \\
+ & Quadratic & $98.619\pm0.422$ & $0.967\pm1.656$ \\
+ & Gaussian process & $98.586\pm0.422$ & $0.947\pm1.622$ \\
+\addlinespace
+Layup transfer & Mechanics-informed & $0.067\pm0.005$ & $0.122\pm0.078$ \\
+ & Quadratic & $0.204\pm0.002$ & $0.066\pm0.036$ \\
+ & Gaussian process & $0.081\pm0.002$ & $0.060\pm0.010$ \\
+\addlinespace
+Geometry extrapolation & Mechanics-informed & $0.254\pm0.009$ & $0.305\pm0.155$ \\
+ & Quadratic & $0.283\pm0.032$ & $0.359\pm0.102$ \\
+ & Gaussian process & $0.159\pm0.021$ & $0.246\pm0.090$ \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Across all 24 validation points, calibration reduced RMSE by 99.23\% and MAPE by 99.46\%. Nominal predictions show a nearly uniform 9.94\% underprediction. The one-point correction removes this common bias while preserving the width--thickness response trend. The fitted common scale is close to the withheld in-plane stiffness scale of 0.90, although the withheld shear scale is 1.15. It must not be interpreted as recovering the two hidden properties: one scalar compliance observation cannot independently identify an in-plane scale and a transverse-shear scale. The correction is a response-equivalent adjustment for this target set.
+For the same-layup material-interpolation set, nominal predictions assume factors $(1,1)$ while the target uses $(1.5,1.5)$. Calibration recovers factors near the target and lowers held-out MAPE from about 50\% to below 0.2\% for all models. For material extrapolation, nominal MAPE is about 99\%; informative calibration pairs again reduce it substantially. However, one random pair (case IDs 37 and 39) consists of two 32-ply cases at widths 0.06 and 0.10 m. Width changes both bending and shear compliance by a similar scale, so that pair does not separate carbon and glass effects. The mechanics Jacobian is rank deficient (rank 1; condition number about $2.2\times10^{16}$), and other models also produce poor scale estimates for that repeat. The three-repeat average therefore hides a calibration-design failure; the fitted factors and conditioning must be examined alongside prediction scores.
 
-The 16 extrapolation cases extend only modestly beyond Dataset A's geometry range: width is 0.025--0.075 m versus 0.030--0.070 m in training, and thickness scale is 0.60--1.40 versus 0.70--1.30. The result does not support arbitrary extrapolation or transfer to changed length, layup, curvature, load regime, or support conditions.
+\subsection{Dataset B subset 3: alternate-layup detail}
+Subset 3 is the 20-case \texttt{layup\_transfer} set, IDs 40--59. Its widths are 0.02--0.10 m and ply counts are 8, 16, 24, and 32. All FEA target cases have configured material factors $(1,1)$. Dataset A is the only training data; subset 3 is used solely for calibration and validation.
 
-The result is encouraging for the intended methodology but is a controlled FEA-to-FEA test. Both datasets were generated with the same SHELL181 model and same nominal modelling framework, so no real material discrepancy or experimental noise is represented. The archive reports a single 40$\times$6 mesh and does not include MAPDL/PyMAPDL version identifiers or solver logs. Mesh convergence and numerical setup checks remain outstanding for this particular sweep.
-
-Finally, $|u|/L$ ranges from approximately 0.006 to 0.234 in Dataset B (maximum 0.158 in Dataset A). The softest cases therefore exhibit large normalized displacement despite the linear static analysis. Results establish response transfer for these FEA outputs only; they should not be presented as evidence that the small-deflection model is valid for those geometries or as a physical landing-gear prediction. Repeat at a load/domain that keeps deflection small, and complete mesh refinement and solver provenance before finalizing the benchmark claim. Historical quadratic-surface and analytical-reference studies remain separate and are not pooled with this run.
-
-\section{Reproducibility}
-From the repository root, with project Python dependencies, PyMAPDL, and a licensed local MAPDL installation, run:
-\begin{verbatim}
-python src/run_property_transfer_study.py --stage all \\
-  --config config.hidden_property.example.json --layup layup.json
-\end{verbatim}
-The default CSV paths are \path{results/property_transfer_grid/dataset_A.csv} and \path{dataset_B.csv}; the fitted model, predictions, and metrics are written beneath \path{results/property_transfer_grid/model/}. The analysis can also be run in stages using \texttt{--stage dataset-a}, \texttt{--stage dataset-b}, and \texttt{--stage calibrate}. Calibration requires both CSV datasets but does not launch MAPDL. Record the exact command, MAPDL/PyMAPDL versions, solver log, and configuration used so the run can be reproduced.
-
-\section{AI use and student reflection}
-AI tools assisted with scripting, debugging, drafting, and source discovery. The student is responsible for verifying code, sources, assumptions, and conclusions. Add a personal reflection on one useful contribution, one limitation caught, how outputs were checked, and which decisions were made independently.
-
-\clearpage
+\begin{table}[ht]
+\centering
 \small
-\begin{thebibliography}{9}
-\bibitem{ansysShell181} Ansys, Inc., \emph{SHELL181 Element Documentation}, Ansys Mechanical APDL Element Reference. \url{https://ansyshelp.ansys.com/public/account/secured?returnurl=/Views/Secured/corp/v242/en/ans_elem/Hlp_E_SHELL181.html}.
-\bibitem{pymapdlSections} Ansys, Inc., \emph{PyMAPDL secdata API}. \url{https://mapdl.docs.pyansys.com/version/stable/api/_autosummary/ansys.mapdl.core.Mapdl.secdata.html}.
-\bibitem{reddy} J. N. Reddy, \emph{Mechanics of Laminated Composite Plates and Shells: Theory and Analysis}, 2nd ed., CRC Press, 2004.
-\bibitem{gurit} Gurit, \emph{SE84LV High Performance Prepreg System: Product Data Sheet}, 2024. \url{https://www.revchem.com/document/15pc135966a_tds-pdf/}.
-\bibitem{glass} University of Cambridge, representative UD glass/epoxy lamina data, \url{https://teaching.eng.cam.ac.uk/system/files/P2B2010QC002.pdf}.
-\end{thebibliography}
+\caption{Subset 3 calibration pairs, fitted scale factors, and held-out MAPE.}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{crrrrrrr}
+\toprule
+Model & Repeat & Calibration IDs & $q_C$ & $q_G$ & Nominal MAPE (\%) & Calibrated MAPE (\%) \\
+\midrule
+Mechanics & 1 & 48, 55 & 1.0022 & 0.9736 & 0.0719 & 0.0877 \\
+Mechanics & 2 & 54, 56 & 1.0065 & 0.9195 & 0.0668 & 0.2112 \\
+Mechanics & 3 & 54, 58 & 1.0003 & 1.0178 & 0.0625 & 0.0669 \\
+Quadratic & 1 & 48, 55 & 0.9965 & 1.0241 & 0.2062 & 0.0505 \\
+Quadratic & 2 & 54, 56 & 0.9946 & 1.0483 & 0.2046 & 0.1070 \\
+Quadratic & 3 & 54, 58 & 0.9975 & 1.0000 & 0.2024 & 0.0395 \\
+Gaussian process & 1 & 48, 55 & 0.9985 & 1.0082 & 0.0829 & 0.0481 \\
+Gaussian process & 2 & 54, 56 & 0.9980 & 1.0110 & 0.0800 & 0.0648 \\
+Gaussian process & 3 & 54, 58 & 0.9981 & 1.0071 & 0.0790 & 0.0659 \\
+\bottomrule
+\end{tabular}}
+\end{table}
 
+The corresponding validation IDs are: repeat 1, 40--47, 49--54, 56--59; repeat 2, 40--53, 55, 57--59; repeat 3, 40--53, 55--57, 59. Thus, each repeat validates on 18 cases and excludes only its own calibration pair. Fitted factors remain near $(1,1)$, consistent with the configured target cards. Nominal predictions were already accurate because the model received those known cards and the alternate layup's calculated effective properties. Calibration modestly improved quadratic and Gaussian-process average errors but worsened the mechanics-informed average. This is not a test of estimating entirely unknown material properties: it is a layup-transfer test with known nominal material cards and optional response-based adjustment.
+
+\section{Discussion and limitations}
+The results show that a small number of observations can correct a response model when the target variation is represented by the calibration parameters and the selected observations are informative. They also show that low Dataset A cross-validation error does not guarantee robust target calibration. Calibration pair selection matters: two response measurements should produce distinct sensitivities to the unknown property factors. A high Jacobian condition number or deficient rank signals that the fitted factors should not be interpreted.
+
+The alternate-layup and geometry-extrapolation cases had low nominal MAPE because their configured section properties were available and close to the training response domain. Calibration brought little benefit there and sometimes increased error by adjusting the property factors to absorb small model residuals. This is consistent with a correction method that should be applied only when justified by observations and diagnostics.
+
+The analysis is linear static and uses 10 N. The maximum reported target $|\delta|/L$ is 1.70; 21 of 80 target cases and 22 of 80 training cases exceed 0.1. The most extreme target is the 8-ply, 0.015 m-wide case, with about 0.425 m tip deflection for a 0.25 m beam. These large-displacement cases are outside a small-deflection interpretation, even though the linear solver returns a compliance. Restrict the benchmark to a suitable small-deflection range or rerun at lower loads and state the intended validity domain.
+
+All cases used a 40 by 6 mesh. The supplied result archive does not include a mesh-convergence study for these exact property-transfer cases, solver log, or MAPDL/PyMAPDL version record. Before interpreting sub-percent surrogate errors as meaningful FE accuracy, verify mesh sensitivity and reactions and check element orientation, supports, load application, and possible locking. The results do not address impact dynamics, failure, progressive damage, manufacturing constraints, or curved landing-gear geometry.
+
+\section{Conclusion and next steps}
+This trial implemented the planned training-calibration-validation workflow and compared three surrogate types. It provides a clear proof of concept for transferring compliance predictions between controlled FEA datasets when the material change can be represented by fitted stiffness scale factors. It also exposed two important qualifications: nominal predictions require a baseline material description, and calibration observations must be chosen to identify the unknown factors. The new-layup subset used known configured properties for its nominal predictions; it was not a no-material-knowledge test.
+
+Next, select calibration pairs by maximizing sensitivity separation, add further repeats or calibration points to quantify robustness, and verify the FEA mesh and small-deflection domain. A subsequent study can then introduce observations from a trusted analytical model or physical testing. Applying the method to curved gear geometry and optimizing mass/stroke are future extensions, not outcomes of this trial.
+
+\begin{thebibliography}{9}
+\bibitem{ansys} Ansys, Inc., \emph{SHELL181 Element Documentation}, Mechanical APDL Element Reference, Ansys. \url{https://ansyshelp.ansys.com/public/account/secured?returnurl=/Views/Secured/corp/v242/en/ans_elem/Hlp_E_SHELL181.html}
+\bibitem{reddy} J. N. Reddy, \emph{Mechanics of Laminated Composite Plates and Shells: Theory and Analysis}, 2nd ed., CRC Press, 2004.
+\bibitem{pymapdl} Ansys, Inc., \emph{PyMAPDL documentation}, Ansys. \url{https://mapdl.docs.pyansys.com/version/stable/}
+\end{thebibliography}
 \end{document}

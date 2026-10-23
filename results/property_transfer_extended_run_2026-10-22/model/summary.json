@@ -1,0 +1,61 @@
+{
+  "training_model_metrics": {
+    "mechanics": {
+      "n": 80,
+      "rmse_m_per_N": 3.976796247028651e-06,
+      "mae_m_per_N": 2.1631129827498384e-06,
+      "mape_percent": 0.10544959543413368,
+      "max_ape_percent": 0.23312885592796273,
+      "r2": 0.9999995361593406
+    },
+    "quadratic": {
+      "n": 80,
+      "rmse_m_per_N": 2.0794753754610116e-07,
+      "mae_m_per_N": 9.368465946437691e-08,
+      "mape_percent": 0.004347377222181692,
+      "max_ape_percent": 0.010396755395081256,
+      "r2": 0.999999998731736
+    },
+    "gaussian_process": {
+      "n": 80,
+      "rmse_m_per_N": 1.6428723312561924e-06,
+      "mae_m_per_N": 4.485131338402331e-07,
+      "mape_percent": 0.016238091846388983,
+      "max_ape_percent": 0.06795091813422723,
+      "r2": 0.9999999208392745
+    }
+  },
+  "training_fivefold_cv_metrics": {
+    "mechanics": {
+      "n": 80,
+      "rmse_m_per_N": 4.363698937724683e-06,
+      "mae_m_per_N": 2.351538241156644e-06,
+      "mape_percent": 0.10834116769070312,
+      "max_ape_percent": 0.2657443637795854,
+      "r2": 0.9999994415147665
+    },
+    "quadratic": {
+      "n": 80,
+      "rmse_m_per_N": 2.796930407974319e-07,
+      "mae_m_per_N": 1.2609865699685952e-07,
+      "mape_percent": 0.005272910640407922,
+      "max_ape_percent": 0.012350733739108286,
+      "r2": 0.9999999977056194
+    },
+    "gaussian_process": {
+      "n": 80,
+      "rmse_m_per_N": 2.1708804328553415e-06,
+      "mae_m_per_N": 6.063437917666173e-07,
+      "mape_percent": 0.01946798084958804,
+      "max_ape_percent": 0.07892337449529353,
+      "r2": 0.9999998617790278
+    }
+  },
+  "experiment": {
+    "dataset_a_cases": 80,
+    "target_cases": 80,
+    "calibration_repeats": 3,
+    "calibration_points": 2
+  },
+  "calibration_warning": "Two points are the algebraic minimum for two factors. Inspect Jacobian rank and condition number before interpreting factors."
+}

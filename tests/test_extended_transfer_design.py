@@ -1,0 +1,54 @@
+import json
+from pathlib import Path
+import sys
+import unittest
+
+sys.path.insert(0, str(Path(__file__).parents[1] / "src"))
+from run_extended_transfer_study import make_designs, section_data, symmetric_stack
+
+
+CONFIG = Path(__file__).parents[1] / "config.extended_transfer.example.json"
+
+
+class ExtendedTransferDesignTests(unittest.TestCase):
+  def test_factorial_case_counts_and_levels(self):
+    cfg = json.loads(CONFIG.read_text())
+    a, targets = make_designs(cfg)
+    self.assertEqual(len(a), 80)
+    self.assertEqual(len(targets), 80)
+    self.assertEqual(a["width_m"].nunique(), 5)
+    self.assertEqual(a["ply_count"].nunique(), 4)
+    self.assertEqual(len(a[["carbon_scale", "glass_scale"]].drop_duplicates()), 4)
+    self.assertEqual(targets.groupby("target_set").size().to_dict(), {
+        "material_interpolation": 20,
+        "material_extrapolation": 20,
+        "layup_transfer": 20,
+        "geometry_extrapolation": 20,
+    })
+
+
+  def test_symmetric_stacks_and_nominal_thicknesses(self):
+    for nplies, expected_mm in ((8, 1.2), (16, 2.4), (24, 3.6), (32, 4.8), (100, 15.0)):
+        stack = symmetric_stack("tw_glass", nplies)
+        self.assertEqual(stack, stack[::-1])
+        self.assertEqual(stack.count("CF_TWILL"), nplies // 2)
+        self.assertEqual(stack.count("GF"), nplies // 2)
+        self.assertAlmostEqual(stack.count("CF_TWILL") * 0.2 + stack.count("GF") * 0.1, expected_mm)
+
+
+  def test_design_records_actual_stack_and_extrapolation_axes(self):
+    cfg = json.loads(CONFIG.read_text())
+    _, targets = make_designs(cfg)
+    geometry = targets[targets.target_set == "geometry_extrapolation"]
+    self.assertEqual(set(geometry.width_region), {"in_range", "extrapolation"})
+    self.assertEqual(set(geometry.ply_count_region), {"in_range", "extrapolation"})
+    row = targets[targets.target_set == "layup_transfer"].iloc[0].to_dict()
+    props = section_data(cfg, row)
+    self.assertEqual(len(row["ply_sequence_bottom_to_top"].split("-")), row["ply_count"])
+    self.assertGreater(props["total_thickness_m"], 0)
+    self.assertGreater(props["D_eff_Nm_per_m"], 0)
+    self.assertGreater(props["S_eff_N_per_m"], 0)
+
+
+if __name__ == "__main__":
+    unittest.main()

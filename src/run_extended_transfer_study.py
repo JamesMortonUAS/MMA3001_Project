@@ -35,9 +35,6 @@ from sklearn.preprocessing import PolynomialFeatures, StandardScaler
 from sklearn.model_selection import KFold
 from sklearn.base import clone
 
-from laminate_section import effective_bending_shear_stiffness
-
-
 BASE_DIR = Path("results/property_transfer_extended")
 ORTHO_FIELDS = {
     "EX_Pa": "EX", "EY_Pa": "EY", "EZ_Pa": "EZ",
@@ -47,6 +44,48 @@ ORTHO_FIELDS = {
 }
 ELASTIC_KEYS = ("EX_Pa", "EY_Pa", "EZ_Pa", "GXY_Pa", "GYZ_Pa", "GXZ_Pa")
 FEATURES = ["width_m", "total_thickness_m", "D_eff_Nm_per_m", "S_eff_N_per_m"]
+
+
+def effective_bending_shear_stiffness(layup: dict) -> tuple[float, float]:
+    """Return CLT effective D11 [N m] and x-z shear rigidity [N/m].
+
+    This small helper is kept in the runner so the new experiment is runnable
+    even when the legacy laminate_section module is absent from a local clone.
+    The experiment uses zero-degree plies; non-zero orientations are rejected.
+    """
+    cards = layup["material_cards"]
+    plies = layup["plies"]
+    height = sum(float(cards[p["material"]]["ply_thickness_m"]) for p in plies)
+    z = -0.5 * height
+    abd = np.zeros((6, 6), dtype=float)
+    shear_xz = 0.0
+    for ply in plies:
+        name = str(ply["material"])
+        if abs(float(ply.get("orientation_deg", 0.0))) > 1e-12:
+            raise NotImplementedError("The extended transfer study currently uses 0-degree plies only")
+        card = cards[name]
+        t = float(card["ply_thickness_m"])
+        e1, e2, nu12, g12 = (float(card[k]) for k in ("EX_Pa", "EY_Pa", "PRXY", "GXY_Pa"))
+        nu21 = nu12 * e2 / e1
+        den = 1.0 - nu12 * nu21
+        if den <= 0.0:
+            raise ValueError(f"Invalid in-plane elastic constants for {name}")
+        q = np.zeros((3, 3), dtype=float)
+        q[0, 0] = e1 / den
+        q[1, 1] = e2 / den
+        q[0, 1] = q[1, 0] = nu12 * e2 / den
+        q[2, 2] = g12
+        z_next = z + t
+        abd[:3, :3] += q * t
+        abd[:3, 3:] += q * (z_next**2 - z**2) / 2.0
+        abd[3:, :3] += q * (z_next**2 - z**2) / 2.0
+        abd[3:, 3:] += q * (z_next**3 - z**3) / 3.0
+        shear_xz += float(card["GXZ_Pa"]) * t
+        z = z_next
+    compliance = float(np.linalg.inv(abd)[3, 3])
+    if compliance <= 0.0 or shear_xz <= 0.0:
+        raise ValueError("Laminate stiffness matrix is not positive definite")
+    return 1.0 / compliance, shear_xz
 
 
 def model_inputs(frame: pd.DataFrame) -> np.ndarray:

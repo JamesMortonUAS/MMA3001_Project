@@ -1,0 +1,13 @@
+target_set,repeat,calibration_case_ids
+material_interpolation,1,"1,12"
+material_interpolation,2,"0,17"
+material_interpolation,3,"6,19"
+material_extrapolation,1,"20,33"
+material_extrapolation,2,"37,39"
+material_extrapolation,3,"28,34"
+layup_transfer,1,"48,55"
+layup_transfer,2,"54,56"
+layup_transfer,3,"54,58"
+geometry_extrapolation,1,"64,65"
+geometry_extrapolation,2,"66,75"
+geometry_extrapolation,3,"60,68"

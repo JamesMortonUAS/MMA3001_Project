@@ -10,6 +10,14 @@
     "integration_points_per_ply": 3,
     "nproc": 2
   },
+  "solver": {
+    "large_deflection": true,
+    "automatic_time_stepping": true,
+    "initial_substeps": 10,
+    "minimum_substeps": 1,
+    "maximum_substeps": 100,
+    "maximum_equilibrium_iterations": 50
+  },
   "dataset_a": {
     "widths_m": [0.02, 0.04, 0.06, 0.08, 0.10],
     "ply_counts": [8, 16, 24, 32],

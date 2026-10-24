@@ -7,8 +7,11 @@
 \usepackage{graphicx}
 \usepackage{enumitem}
 \setlist{nosep,leftmargin=*}
+
 \newcommand{\MAPE}{\mathrm{MAPE}}
+
 \newcommand{\Dref}{D_{\mathrm{eff}}}
+
 \newcommand{\Sref}{S_{\mathrm{eff}}}
 \title{MMA3001 Project\\\large Limited-Observation Calibration of Composite Beam Compliance Models}
 \author{James Morton -- 33853967}
@@ -17,7 +20,7 @@
 \maketitle
 
 \begin{abstract}
-This project demonstrates a workflow for fitting a finite-element-analysis (FEA) response model, calibrating it with a small number of observations, and testing predictions on withheld cases. The updated PyAnsys MAPDL model uses large-deflection static analysis for 80 training and 80 target cases of a straight, layered composite cantilever. Three model classes are compared: a mechanics-informed compliance regression, a quadratic response surface, and a Gaussian process. For each target set, two responses calibrate carbon and glass stiffness scale factors and 18 other cases are held out, repeated with three calibration pairs. The updated nonlinear FEA sweep has not yet been run; numeric validation results in this report are clearly marked as results from the earlier linear-static baseline and must not be attributed to the new formulation. The historical trial showed that two observations do not always identify two material corrections. The alternate-layup baseline used known configured material cards, not a blind unknown-material prediction. This study is FEA-to-FEA only and does not validate physical material properties or a curved landing-gear leg.
+This project demonstrates a workflow for fitting a finite-element-analysis (FEA) response model, calibrating it with a small number of observations, and testing predictions on withheld cases. The updated PyAnsys MAPDL model uses large-deflection static analysis for 80 training cases and 100 target cases across five sets. The fifth set adds a doubled resin-to-fibre ratio as an unmodelled composition shift. Three model classes are compared: a mechanics-informed compliance regression, a quadratic response surface, and a Gaussian process. Each target set uses three repeats of two-observation carbon/glass calibration with 18 held-out cases. The 180-case nonlinear FEA sweep has not yet been run; numeric validation results in this report are from the earlier linear-static, four-set baseline and must not be attributed to the updated experiment. The historical trial showed that two observations do not always identify two material corrections. The alternate-layup baseline used known configured material cards, not a blind unknown-material prediction. This study is FEA-to-FEA only and does not validate physical material properties or a curved landing-gear leg.
 \end{abstract}
 
 \section{Introduction}
@@ -47,7 +50,7 @@ Ply count & Twill/glass total thickness & UD/twill/glass total thickness & Unit 
 \end{tabular}
 \end{table}
 
-Orthotropic elastic and shear properties are specified in the example configuration. For the transfer experiment, a carbon factor scales the elastic and shear moduli of carbon plies, and a glass factor scales those of glass plies; density, Poisson ratios, and ply thickness do not change when these factors vary. The cards and cured ply values are computational assumptions, not measured project material properties.
+Orthotropic elastic and shear properties are specified in the example configuration. For the transfer experiment, a carbon factor scales the elastic and shear moduli of carbon plies, and a glass factor scales those of glass plies; density, Poisson ratios, and ply thickness do not change when these factors vary. The cards and cured ply values are computational assumptions, not measured project material properties. For target Set 5 only, the resin-ratio proxy remixes the effective elastic and shear moduli using an assumed epoxy matrix modulus of 3.0 GPa and Poisson ratio 0.35. The configured baseline resin fraction is 50 vol%; doubling the resin:fibre volume ratio gives 66.7 vol% resin. Density and ply thickness are fixed, so this is a compliance-only proxy rather than a mass or physical resin-uptake model.
 
 The response is tip compliance,
 \begin{equation}
@@ -71,7 +74,7 @@ Dataset A contains the full 5 by 4 by 4 factorial design: five widths, four ply 
 This gives 80 FEA responses. The training cases span the base twill/glass stack and the configured carbon/glass stiffness variation.
 
 \subsection{Dataset B: target sets}
-Dataset B contains four 20-case sets (80 cases total). Except for geometry extrapolation, each set uses the Dataset A widths and ply counts.
+Dataset B contains five 20-case sets (100 cases total). Sets 1–3 and 5 use the Dataset A widths and ply counts; geometry extrapolation uses its separately defined levels.
 \begin{table}[ht]
 \centering
 \small
@@ -84,9 +87,12 @@ Material interpolation & Twill/glass layup; carbon/glass factors $(1.5,1.5)$. \\
 Material extrapolation & Twill/glass layup; factors $(2.25,0.75)$. \\
 Layup transfer & Symmetric UD/twill/glass layup; factors $(1,1)$. \\
 Geometry extrapolation & Twill/glass layup; widths 0.015, 0.04, 0.06, 0.08, 0.15 m and ply counts 8, 16, 32, 100; factors $(1,1)$. \\
+Material extrapolation v2 & Twill/glass; carbon/glass factors $(2.25,0.75)$; double the baseline resin:fibre volume ratio. \\
 \bottomrule
 \end{tabularx}
 \end{table}
+
+Set 5 deliberately changes a third material attribute that the correction model does not fit. Its target FEA cards use a two-times resin:fibre ratio, while nominal and calibrated surrogate features assume the baseline ratio. The two observations still fit only carbon and glass stiffness multipliers; the validation therefore measures whether those corrections absorb an unmodelled resin-rich shift, not whether the resin ratio is identified. The matrix modulus is based on typical cured tensile modulus in the Westlake EPIKOTE LR285 technical data sheet; the matrix Poisson ratio and the 50% baseline fraction for glass are illustrative assumptions. The 50% resin baseline for twill is consistent with the midpoint of a cited woven-carbon laminate fibre-volume range.
 
 The layup-transfer case is important to interpret correctly. Its FEA targets were generated with the material cards in the configuration at factors $(1,1)$. Those same configured cards and the known alternate ply sequence were used to calculate nominal laminate section properties for prediction. Thus nominal predictions were not made with no material knowledge: this set tests transfer to a different layup using known nominal material cards. During calibration, the model was allowed to adjust the carbon and glass factors around that baseline using only response observations. The configured truth factors were not supplied to the calibration optimizer.
 
@@ -111,7 +117,7 @@ Three models are fit to Dataset A only:
 Five-fold cross-validation on Dataset A estimates within-training-domain predictive performance. Target FEA responses are not used to fit or select the Dataset A models. The mechanics-informed linear bending/shear basis is retained as a transparent baseline; it does not model large-rotation kinematics and is not an exact nonlinear beam solution.
 
 \subsection{Calibration and held-out validation}
-For each target set, three calibration repeats are performed. A pair of target cases is randomly selected for each repeat; the same pair is used across model families. For each fitted model, nonlinear least squares estimates two multipliers, $q_C$ and $q_G$, by minimizing the squared log-compliance residuals at the selected cases:
+For each of the five target sets, three calibration repeats are performed. A pair of target cases is randomly selected for each repeat; the same pair is used across model families. For each fitted model, nonlinear least squares estimates two multipliers, $q_C$ and $q_G$, by minimizing the squared log-compliance residuals at the selected cases:
 \begin{equation}
  (q_C^*,q_G^*)=\arg\min_{q_C,q_G}\sum_{i\in\mathcal C}
  \left[\log\widehat C_i(q_C,q_G)-\log C_{i,\mathrm{FEA}}\right]^2,
@@ -122,7 +128,8 @@ Candidate factors are applied to the configured ply material cards, after which 
 The other 18 cases are held out for validation in each repeat. The calibration cases do not appear in the validation metrics. Reported measures include MAPE, maximum absolute percentage error, RMSE, and $R^2$. Calibration fits two unknown factors from the algebraic minimum of two observations, so a poorly chosen pair may produce non-identifiable or unstable factors. Jacobian rank and condition number are recorded. Runtime is measured separately for each FEA case, model fit, five-fold cross-validation, and target calibration/prediction; these timings are machine-specific and are saved with the outputs.
 
 \section{Historical results from the linear-static baseline}
-\noindent\textbf{These tables report the previous linear-static run only. They are retained for comparison and are not results from the updated `NLGEOM,ON` model. The nonlinear sweep must be rerun before reporting current validation scores or runtime comparisons.}
+
+\noindent\textbf{These tables report only the historical linear-static run: 80 target cases across the first four sets. They do not include the new resin-ratio Set 5 and are not results from the updated `NLGEOM,ON` experiment. The 180-case nonlinear sweep must be run before reporting current validation scores or runtime comparisons.}
 \subsection{Dataset A cross-validation}
 \begin{table}[ht]
 \centering
@@ -210,12 +217,14 @@ All cases are designed to use a 40 by 6 mesh. The previous result archive does n
 \section{Conclusion and next steps}
 The prior linear-static trial implemented the training-calibration-validation workflow and compared three surrogate types. The updated runner now defines a nonlinear large-deflection static formulation, explicit input checks, case-signature protection against stale output reuse, and runtime instrumentation. The new formulation still requires a complete MAPDL rerun before its fit, calibration, validation and cost can be assessed. The prior trial showed that nominal predictions require a baseline material description, and calibration observations must identify the unknown factors. Its new-layup subset used known configured properties; it was not a no-material-knowledge test.
 
-Next, regenerate all 160 cases using `NLGEOM,ON`, review solver convergence and force/reaction balance, then refit all three models and report new validation and timing results. Select calibration pairs by maximizing sensitivity separation and verify mesh convergence for representative cases. A subsequent study can introduce observations from a trusted analytical model or physical testing. Applying the method to curved gear geometry and optimizing mass/stroke are future extensions, not outcomes of this trial.
+Next, generate all 180 cases using `NLGEOM,ON`, review solver convergence and force/reaction balance, then refit all three models and report new validation and timing results. Select calibration pairs by maximizing sensitivity separation and verify mesh convergence for representative cases. A subsequent study can introduce observations from a trusted analytical model or physical testing. Applying the method to curved gear geometry and optimizing mass/stroke are future extensions, not outcomes of this trial.
 
 \begin{thebibliography}{9}\footnotesize
 \bibitem{nlgeom} Ansys, Inc., \emph{NLGEOM Command: Includes Large-Deflection Effects in Static or Full Transient Analysis}, Mechanical APDL Command Reference, Release 2024 R2. \url{https://ansyshelp.ansys.com/public/Views/Secured/corp/v242/en/ans_cmd/Hlp_C_NLGEOM.html}
 \bibitem{ansys} Ansys, Inc., \emph{SHELL181 Element Documentation}, Mechanical APDL Element Reference, Ansys. \url{https://ansyshelp.ansys.com/public/account/secured?returnurl=/Views/Secured/corp/v242/en/ans_elem/Hlp_E_SHELL181.html}
 \bibitem{reddy} J. N. Reddy, \emph{Mechanics of Laminated Composite Plates and Shells: Theory and Analysis}, 2nd ed., CRC Press, 2004.
 \bibitem{pymapdl} Ansys, Inc., \emph{PyMAPDL documentation}, Ansys. \url{https://mapdl.docs.pyansys.com/version/stable/}
+\bibitem{epoxy} Westlake Epoxy, \emph{EPIKOTE Resin MGS LR285 Technical Data Sheet}, typical cured tensile modulus 3.0 GPa. \url{https://shop.swiss-composite.ch/shop/resources/downloads/110_1051/t-Epoxyd-Harz-L-285-LF-e.pdf}
+\bibitem{gurit} Gurit, \emph{SE84LV Prepreg Product Data Sheet}, woven carbon fibre volume fraction 47--53\%. \url{https://www.revchem.com/document/15pc135966a_tds-pdf/}
 \end{thebibliography}
 \end{document}

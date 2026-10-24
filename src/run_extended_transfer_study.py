@@ -416,6 +416,8 @@ def _case_signature(cfg: dict, row: dict) -> str:
         normalize(payload), sort_keys=True, separators=(",", ":"), allow_nan=False,
     ).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
+
+
 def solve_shell_case(mapdl, cfg: dict, row: dict) -> dict:
     """Solve one generic symmetric layered shell cantilever in MAPDL."""
     started = perf_counter()

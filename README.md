@@ -17,7 +17,7 @@ The model uses a 0.25 m beam, fixed 10 N transverse tip-edge load, fixed root, S
 
 The checked-in numerical results in [the dated report](docs/extended_transfer_results_report_2026-10-22.md) were produced by the **previous linear-static formulation**. They are historical baseline results, not validation of the newly configured large-deflection solver. The nonlinear 160-case sweep has not yet been run. Do not use the old CSVs as nonlinear output; the new default output directory is `results/property_transfer_large_deflection/`, and resume validation checks that case definitions match.
 
-The updated source and focused tests are on branch `feat/large-deflection-transfer-study`. After updating your checkout, run from the repository root in PowerShell:
+The updated source and focused tests are on `main`. Pull the latest changes, then run from the repository root in PowerShell:
 
 ```powershell
 python -m unittest discover -s tests -v

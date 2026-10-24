@@ -33,7 +33,7 @@ class ExtendedTransferDesignTests(unittest.TestCase):
     mapdl = FakeMapdl()
     configure_large_deflection(mapdl, cfg)
     self.assertEqual(mapdl.commands, [
-        "NLGEOM,ON", "AUTOTS,ON", "NSUBST,10,1,100", "NEQIT,50", "NROPT,FULL"
+        "NLGEOM,ON", "AUTOTS,ON", "NSUBST,10,100,1", "NEQIT,50", "NROPT,FULL"
     ])
 
   def test_config_validation_rejects_unsupported_small_deflection_or_invalid_geometry(self):

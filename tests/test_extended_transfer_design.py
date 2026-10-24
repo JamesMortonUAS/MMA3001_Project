@@ -1,4 +1,5 @@
 import json
+import math
 from pathlib import Path
 import sys
 import copy
@@ -118,6 +119,15 @@ class ExtendedTransferDesignTests(unittest.TestCase):
     changed = copy.deepcopy(cfg)
     changed["resin_model"]["matrix_modulus_Pa"] *= 1.1
     self.assertNotEqual(signature, _case_signature(changed, row))
+
+  def test_target_case_signature_accepts_optional_nan_region_labels(self):
+    cfg = json.loads(CONFIG.read_text())
+    _, targets = make_designs(cfg)
+    # Non-geometry target sets have NaN in optional region columns after
+    # pandas combines all target designs into one table.
+    row = targets.iloc[0].to_dict()
+    self.assertTrue(math.isnan(row["width_region"]))
+    self.assertEqual(len(_case_signature(cfg, row)), 64)
 
   def test_resin_ratio_proxy_changes_truth_stiffness_but_prediction_uses_nominal(self):
     cfg = json.loads(CONFIG.read_text())

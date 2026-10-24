@@ -392,6 +392,20 @@ def configure_large_deflection(mapdl, cfg: dict) -> None:
 
 def _case_signature(cfg: dict, row: dict) -> str:
     """Hash the full FEA definition and case design to prevent stale resume."""
+
+    def normalize(value):
+        """Convert pandas/numpy scalars and missing design labels to JSON values."""
+        if isinstance(value, dict):
+            return {str(key): normalize(item) for key, item in value.items()}
+        if isinstance(value, (list, tuple)):
+            return [normalize(item) for item in value]
+        if isinstance(value, np.generic):
+            value = value.item()
+        if isinstance(value, float) and not math.isfinite(value):
+            # Non-geometry target rows have missing optional region labels.
+            return None
+        return value
+
     payload = {
         "beam": cfg["beam"], "mesh": cfg["mesh"], "solver": cfg["solver"],
         "solver_command_semantics": "NSUBST_initial_max_min;POST1_SET_LAST_v2",
@@ -399,8 +413,7 @@ def _case_signature(cfg: dict, row: dict) -> str:
         "materials": cfg["materials"], "case": row,
     }
     encoded = json.dumps(
-        payload, sort_keys=True, separators=(",", ":"), allow_nan=False,
-        default=lambda value: value.item() if isinstance(value, np.generic) else str(value),
+        normalize(payload), sort_keys=True, separators=(",", ":"), allow_nan=False,
     ).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
 

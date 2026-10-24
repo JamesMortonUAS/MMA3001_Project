@@ -12,12 +12,12 @@
 \newcommand{\Sref}{S_{\mathrm{eff}}}
 \title{MMA3001 Project\\\large Limited-Observation Calibration of Composite Beam Compliance Models}
 \author{James Morton -- 33853967}
-\date{23 October 2026}
+\date{24 October 2026}
 \begin{document}
 \maketitle
 
 \begin{abstract}
-This project demonstrates a workflow for fitting a finite-element-analysis (FEA) response model, calibrating it with a small number of observations, and testing predictions on withheld cases. The latest trial uses PyAnsys MAPDL to generate 80 training cases and 80 target cases for a straight, layered composite cantilever. Three model classes are compared: a mechanics-informed compliance regression, a quadratic response surface, and a Gaussian process. For each of four target sets, two responses calibrate carbon and glass stiffness scale factors; 18 other cases per repeat are held out for validation, with three calibration repeats. The models predict FEA-generated responses well after informative calibration for same-layup material changes. A deliberately uninformative calibration pair shows that two observations do not guarantee identifiable material corrections. The alternate-layup trial used configured material cards as its nominal baseline, so it demonstrates layup transfer with known nominal properties rather than prediction with no material knowledge. The study is FEA-to-FEA only; it does not validate physical material properties or a curved landing-gear leg. Large normalized deflections in some linear-static cases and outstanding mesh verification further limit physical interpretation.
+This project demonstrates a workflow for fitting a finite-element-analysis (FEA) response model, calibrating it with a small number of observations, and testing predictions on withheld cases. The updated PyAnsys MAPDL model uses large-deflection static analysis for 80 training and 80 target cases of a straight, layered composite cantilever. Three model classes are compared: a mechanics-informed compliance regression, a quadratic response surface, and a Gaussian process. For each target set, two responses calibrate carbon and glass stiffness scale factors and 18 other cases are held out, repeated with three calibration pairs. The updated nonlinear FEA sweep has not yet been run; numeric validation results in this report are clearly marked as results from the earlier linear-static baseline and must not be attributed to the new formulation. The historical trial showed that two observations do not always identify two material corrections. The alternate-layup baseline used known configured material cards, not a blind unknown-material prediction. This study is FEA-to-FEA only and does not validate physical material properties or a curved landing-gear leg.
 \end{abstract}
 
 \section{Introduction}
@@ -26,7 +26,7 @@ Composite landing-gear design can require costly physical testing to determine h
 The present trial is a controlled methodology demonstration, not a landing-impact simulation or a mass optimization. It uses a straight cantilever as a tractable benchmark. No physical testing observations are included, and the material cards are numerical assumptions. Consequently, the validation performed here compares model predictions with held-out FEA results generated using the same modeling framework; it does not establish agreement with a manufactured gear.
 
 \section{Finite-element model}
-The beam is a flat rectangular layered shell with fixed length $L=0.25\,\mathrm{m}$. The axis is global $X$, width is global $Y$, and the applied transverse force is global $-Z$. The root edge is fully fixed. A total 10 N load is distributed equally across nodes on the free tip edge. The analysis is linear static.
+The beam is a flat rectangular layered shell with fixed length $L=0.25\,\mathrm{m}$. The axis is global $X$, width is global $Y$, and the applied transverse force is global $-Z$. The root edge is fully fixed. A total 10 N load is distributed equally across nodes on the free tip edge. The updated analysis is nonlinear static with large-deflection effects enabled using MAPDL \texttt{NLGEOM,ON} \cite{nlgeom}. Automatic time stepping is enabled with 10 initial substeps, a 1--100 substep range, up to 50 equilibrium iterations per substep, and full Newton-Raphson iterations. This accounts for geometric nonlinearity from large rotations while retaining the example's orthotropic linear-elastic material cards.
 
 The mesh uses SHELL181 layered shell elements, with 40 divisions along the length and 6 across the width. Three through-thickness integration points are assigned per ply. This is a two-dimensional shell discretization with a layered section, not a three-dimensional solid model. All cases use the same mesh.
 
@@ -53,7 +53,12 @@ The response is tip compliance,
 \begin{equation}
  C=\frac{|\bar{u}_{z,\mathrm{tip}}|}{P},
 \end{equation}
-where $\bar{u}_{z,\mathrm{tip}}$ is the mean vertical tip-edge displacement and $P=10\,\mathrm{N}$. Compliance has units of m/N and is load-normalized for the linear-static analyses. The case files also record effective section properties, mass, ply sequence, thickness, signed deflection, and $|\delta|/L$.
+where $\bar{u}_{z,\mathrm{tip}}$ is the mean vertical tip-edge displacement and $P=10\,\mathrm{N}$. Compliance has units of m/N. Under geometric nonlinearity, $C=|\delta|/P$ can depend on load; the model's valid load domain is therefore the fixed 10 N used consistently in both datasets. The case files also record effective section properties, mass, ply sequence, thickness, signed deflection, $|\delta|/L$, FEA wall time, and an analysis signature used to prevent incompatible results from being resumed.
+
+\subsection{Inputs, outputs, and supported domain}
+The configuration is a JSON file with SI units. Beam length, load, width, ply thickness, material moduli, and density must be positive and finite. The present training design uses a 0.25 m beam, 10 N load, widths 0.02--0.10 m, ply counts 8, 16, 24, and 32, and carbon/glass scale pairs $(1,1)$, $(1,2)$, $(2,1)$, and $(2,2)$. Target geometry cases use widths 0.015--0.15 m and even ply counts up to 100. Only symmetric \texttt{tw\_glass} and \texttt{ud\_tw\_glass} stacks made of zero-degree plies are supported. The output is mean vertical tip displacement in metres and compliance in m/N; the CSV also records mass, calculated section stiffnesses, design identifiers, nonlinear-analysis metadata, and elapsed time.
+
+Missing required configuration sections, unsupported stack names, odd or out-of-range ply counts, invalid material cards, nonpositive model predictors, or disabled large-deflection/time-stepping settings cause a clear exception before MAPDL is launched. The current model does not accept a load range, nonzero ply orientations, damage/failure models, or arbitrary material families. Changing load or the FEA definition requires a fresh analysis dataset and model fit; stale linear-static CSVs are rejected by the new case-signature check.
 
 \section{Experiment design and data}
 \subsection{Dataset A: model training}
@@ -103,7 +108,7 @@ Three models are fit to Dataset A only:
 \item \textbf{Quadratic response surface:} second-order polynomial in standardized logarithms of width, total thickness, $\Dref$, and $\Sref$, fit to log compliance with ridge regularization.
 \item \textbf{Gaussian process:} Mat\'ern 5/2 kernel plus a white-noise term, using the same log predictors and log compliance.
 \end{enumerate}
-Five-fold cross-validation on Dataset A estimates within-training-domain predictive performance. Target FEA responses are not used to fit or select the Dataset A models.
+Five-fold cross-validation on Dataset A estimates within-training-domain predictive performance. Target FEA responses are not used to fit or select the Dataset A models. The mechanics-informed linear bending/shear basis is retained as a transparent baseline; it does not model large-rotation kinematics and is not an exact nonlinear beam solution.
 
 \subsection{Calibration and held-out validation}
 For each target set, three calibration repeats are performed. A pair of target cases is randomly selected for each repeat; the same pair is used across model families. For each fitted model, nonlinear least squares estimates two multipliers, $q_C$ and $q_G$, by minimizing the squared log-compliance residuals at the selected cases:
@@ -114,9 +119,10 @@ For each target set, three calibration repeats are performed. A pair of target c
 \end{equation}
 Candidate factors are applied to the configured ply material cards, after which $\Dref$, $\Sref$, $EI$, and $kGA$ are recalculated. The trained model coefficients or surrogate surface are held fixed. The compliance observations are the calibration data; calculated section properties are model inputs, not target observations.
 
-The other 18 cases are held out for validation in each repeat. The calibration cases do not appear in the validation metrics. Reported measures include MAPE, maximum absolute percentage error, RMSE, and $R^2$. Calibration fits two unknown factors from the algebraic minimum of two observations, so a poorly chosen pair may produce non-identifiable or unstable factors. Jacobian rank and condition number are recorded.
+The other 18 cases are held out for validation in each repeat. The calibration cases do not appear in the validation metrics. Reported measures include MAPE, maximum absolute percentage error, RMSE, and $R^2$. Calibration fits two unknown factors from the algebraic minimum of two observations, so a poorly chosen pair may produce non-identifiable or unstable factors. Jacobian rank and condition number are recorded. Runtime is measured separately for each FEA case, model fit, five-fold cross-validation, and target calibration/prediction; these timings are machine-specific and are saved with the outputs.
 
-\section{Results}
+\section{Historical results from the linear-static baseline}
+\noindent\textbf{These tables report the previous linear-static run only. They are retained for comparison and are not results from the updated `NLGEOM,ON` model. The nonlinear sweep must be rerun before reporting current validation scores or runtime comparisons.}
 \subsection{Dataset A cross-validation}
 \begin{table}[ht]
 \centering
@@ -197,16 +203,17 @@ The results show that a small number of observations can correct a response mode
 
 The alternate-layup and geometry-extrapolation cases had low nominal MAPE because their configured section properties were available and close to the training response domain. Calibration brought little benefit there and sometimes increased error by adjusting the property factors to absorb small model residuals. This is consistent with a correction method that should be applied only when justified by observations and diagnostics.
 
-The analysis is linear static and uses 10 N. The maximum reported target $|\delta|/L$ is 1.70; 21 of 80 target cases and 22 of 80 training cases exceed 0.1. The most extreme target is the 8-ply, 0.015 m-wide case, with about 0.425 m tip deflection for a 0.25 m beam. These large-displacement cases are outside a small-deflection interpretation, even though the linear solver returns a compliance. Restrict the benchmark to a suitable small-deflection range or rerun at lower loads and state the intended validity domain.
+The updated geometric-nonlinear analysis is intended to account for large rotations at the configured 10 N load. The prior linear-static run had a maximum target $|\delta|/L$ of 1.70 (21/80 target cases and 22/80 training cases exceeded 0.1); those old displacements and compliance values are not evidence for the new nonlinear formulation. Large rotations do not address material nonlinearity, laminate failure, progressive damage, contact, or landing-impact dynamics. Because compliance is load-dependent in this model, these predictions are restricted to the fixed 10 N case unless new load-level data are generated and included in training.
 
-All cases used a 40 by 6 mesh. The supplied result archive does not include a mesh-convergence study for these exact property-transfer cases, solver log, or MAPDL/PyMAPDL version record. Before interpreting sub-percent surrogate errors as meaningful FE accuracy, verify mesh sensitivity and reactions and check element orientation, supports, load application, and possible locking. The results do not address impact dynamics, failure, progressive damage, manufacturing constraints, or curved landing-gear geometry.
+All cases are designed to use a 40 by 6 mesh. The previous result archive does not include a mesh-convergence study for this exact transfer design, and the updated nonlinear run has not yet supplied solver logs or runtime measurements. Before interpreting model scores, verify mesh sensitivity, reaction balance, element orientation, supports, load application, nonlinear convergence histories, and possible locking. The results do not address impact dynamics, failure, progressive damage, manufacturing constraints, or curved landing-gear geometry.
 
 \section{Conclusion and next steps}
-This trial implemented the planned training-calibration-validation workflow and compared three surrogate types. It provides a clear proof of concept for transferring compliance predictions between controlled FEA datasets when the material change can be represented by fitted stiffness scale factors. It also exposed two important qualifications: nominal predictions require a baseline material description, and calibration observations must be chosen to identify the unknown factors. The new-layup subset used known configured properties for its nominal predictions; it was not a no-material-knowledge test.
+The prior linear-static trial implemented the training-calibration-validation workflow and compared three surrogate types. The updated runner now defines a nonlinear large-deflection static formulation, explicit input checks, case-signature protection against stale output reuse, and runtime instrumentation. The new formulation still requires a complete MAPDL rerun before its fit, calibration, validation and cost can be assessed. The prior trial showed that nominal predictions require a baseline material description, and calibration observations must identify the unknown factors. Its new-layup subset used known configured properties; it was not a no-material-knowledge test.
 
-Next, select calibration pairs by maximizing sensitivity separation, add further repeats or calibration points to quantify robustness, and verify the FEA mesh and small-deflection domain. A subsequent study can then introduce observations from a trusted analytical model or physical testing. Applying the method to curved gear geometry and optimizing mass/stroke are future extensions, not outcomes of this trial.
+Next, regenerate all 160 cases using `NLGEOM,ON`, review solver convergence and force/reaction balance, then refit all three models and report new validation and timing results. Select calibration pairs by maximizing sensitivity separation and verify mesh convergence for representative cases. A subsequent study can introduce observations from a trusted analytical model or physical testing. Applying the method to curved gear geometry and optimizing mass/stroke are future extensions, not outcomes of this trial.
 
-\begin{thebibliography}{9}
+\begin{thebibliography}{9}\footnotesize
+\bibitem{nlgeom} Ansys, Inc., \emph{NLGEOM Command: Includes Large-Deflection Effects in Static or Full Transient Analysis}, Mechanical APDL Command Reference, Release 2024 R2. \url{https://ansyshelp.ansys.com/public/Views/Secured/corp/v242/en/ans_cmd/Hlp_C_NLGEOM.html}
 \bibitem{ansys} Ansys, Inc., \emph{SHELL181 Element Documentation}, Mechanical APDL Element Reference, Ansys. \url{https://ansyshelp.ansys.com/public/account/secured?returnurl=/Views/Secured/corp/v242/en/ans_elem/Hlp_E_SHELL181.html}
 \bibitem{reddy} J. N. Reddy, \emph{Mechanics of Laminated Composite Plates and Shells: Theory and Analysis}, 2nd ed., CRC Press, 2004.
 \bibitem{pymapdl} Ansys, Inc., \emph{PyMAPDL documentation}, Ansys. \url{https://mapdl.docs.pyansys.com/version/stable/}

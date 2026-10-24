@@ -29,10 +29,10 @@ Use the current `main` branch and run these PowerShell commands at the repositor
 python -m unittest discover -s tests -v
 python src/run_extended_transfer_study.py --stage design
 python src/run_extended_transfer_study.py --stage dataset-a --max-cases 1
-python src/run_extended_transfer_study.py --stage targets --max-cases 1
+python src/run_extended_transfer_study.py --stage targets --target-set material_extrapolation_v2 --max-cases 1
 ```
 
-The last two commands smoke-test MAPDL startup. Once they complete, run the full 180-case experiment and model fitting:
+The last two commands smoke-test MAPDL startup, including the new resin-ratio target. Then run the full 180-case experiment and model fitting; the runner will resume the smoke-tested case from the same output folder:
 
 ```powershell
 python src/run_extended_transfer_study.py --stage all

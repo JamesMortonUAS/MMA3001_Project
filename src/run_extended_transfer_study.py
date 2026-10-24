@@ -753,9 +753,16 @@ def main() -> None:
     parser.add_argument("--config", default="config.extended_transfer.example.json")
     parser.add_argument("--output-dir", default=str(BASE_DIR))
     parser.add_argument("--stage", choices=("design", "dataset-a", "targets", "fit", "all"), default="all")
+    parser.add_argument("--target-set", choices=(
+        "material_interpolation", "material_extrapolation", "layup_transfer",
+        "geometry_extrapolation", "material_extrapolation_v2",
+    ),
+                        help="Run only this target set (useful for a targeted MAPDL smoke test).")
     parser.add_argument("--max-cases", type=int, default=None,
                         help="Run only the first N cases for the selected FEA stage (smoke test).")
     args = parser.parse_args()
+    if args.target_set is not None and args.stage != "targets":
+        parser.error("--target-set can only be used with --stage targets")
     cfg = json.loads(Path(args.config).read_text())
     validate_config(cfg)
     if args.max_cases is not None and args.max_cases < 1:
@@ -772,7 +779,10 @@ def main() -> None:
     if args.stage in ("dataset-a", "all"):
         run_fea(cfg, a_design, out / "dataset_A.csv", "Dataset A", args.max_cases)
     if args.stage in ("targets", "all"):
-        run_fea(cfg, target_design, out / "targets.csv", "Targets", args.max_cases)
+        target_run = target_design
+        if args.target_set is not None:
+            target_run = target_design[target_design["target_set"] == args.target_set]
+        run_fea(cfg, target_run, out / "targets.csv", "Targets", args.max_cases)
     if args.stage in ("fit", "all"):
         result = fit_evaluate(cfg, out / "dataset_A.csv", out / "targets.csv", out / "model")
         print(json.dumps(result, indent=2))

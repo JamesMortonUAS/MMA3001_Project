@@ -384,7 +384,7 @@ def configure_large_deflection(mapdl, cfg: dict) -> None:
     mapdl.run("AUTOTS,ON")
     mapdl.run(
         f"NSUBST,{int(solver['initial_substeps'])},"
-        f"{int(solver['minimum_substeps'])},{int(solver['maximum_substeps'])}"
+        f"{int(solver['maximum_substeps'])},{int(solver['minimum_substeps'])}"
     )
     mapdl.run(f"NEQIT,{int(solver['maximum_equilibrium_iterations'])}")
     mapdl.run("NROPT,FULL")
@@ -461,7 +461,7 @@ def solve_shell_case(mapdl, cfg: dict, row: dict) -> dict:
     mapdl.solve()
     mapdl.finish()
     mapdl.post1()
-    mapdl.set(1, 1)
+    # Automatic stepping may change the final substep count. Read the final\n    # converged result set instead of assuming substep 1 exists.\n    mapdl.set("LAST")
     uz = float(np.mean([float(mapdl.get_value("NODE", n, "U", "Z")) for n in tips]))
     mapdl.finish()
     props = section_data(cfg, row, cscale, gscale, resin_ratio)

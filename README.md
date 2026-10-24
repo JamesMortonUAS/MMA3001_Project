@@ -1,39 +1,39 @@
 # MMA3001 Landing Gear Optimisation
 
-This repository demonstrates a limited-observation model calibration workflow using PyAnsys MAPDL finite-element data. The current extended transfer experiment has completed 80 Dataset A simulations and 80 target simulations. It fits mechanics-informed compliance regression, quadratic response-surface and Gaussian-process models to Dataset A, calibrates two carbon/glass stiffness multipliers from two observations per target set, then evaluates held-out predictions.
+This repository demonstrates a limited-observation calibration workflow using PyAnsys MAPDL finite-element data. The current runner is configured for a large-deflection static formulation, with 80 Dataset A training cases and 80 target cases. It compares mechanics-informed compliance regression, a quadratic response surface, and a Gaussian process; each target set uses three two-observation calibration repeats followed by held-out validation.
 
-The experiment is a straight-beam, FEA-to-FEA method study. It uses no physical test data and does not yet model the curved landing-gear leg. The results therefore demonstrate transfer within this assumed FEA setup; they do not validate physical landing-gear response.
+The study uses a straight composite cantilever as a method benchmark. It contains no physical test data and does not model the curved landing-gear leg, so its results demonstrate transfer within the selected FEA setup rather than physical gear accuracy.
 
-## Latest results
+## Current methodology and run instructions
 
-- Full analysis: [extended transfer study results and interpretation](docs/extended_transfer_results_report_2026-10-22.md).
-- Run design and commands: [extended transfer experiment guide](docs/extended_transfer_experiment.md).
-- FEA inputs: 0.25 m cantilever; 10 N total tip-edge load; fully fixed root edge; layered SHELL181 shell mesh, 40 × 6, with 3 integration points per ply; linear-static analysis.
-- Dataset A: 80 cases across 5 widths, 4 ply counts and 4 carbon/glass stiffness combinations.
-- Target data: 80 cases across material interpolation, material extrapolation, alternate layup and geometry extrapolation sets.
-- Validation: three calibration repeats per target set; two observations calibrate and 18 are held out each time.
+- [Current experiment guide](docs/extended_transfer_experiment.md): design, FEA settings, accepted input domain, calibration/validation method, runtime fields, and commands.
+- [Current project report PDF](latex/project_report.pdf) and [LaTeX source](latex/project_report.tex).
+- [Test/build report](docs/test_report.md).
+- [API documentation](docs/api/index.html).
 
-Result CSVs and the summary JSON are in [the dated result folder](results/property_transfer_extended_run_2026-10-22/). The fitted joblib objects are not included; per-case predictions, metrics, case designs and FEA outputs are.
+The model uses a 0.25 m beam, fixed 10 N transverse tip-edge load, fixed root, SHELL181 layered shell elements, 40 x 6 mesh, and three through-thickness integration points per ply. The new runner enables MAPDL `NLGEOM,ON`, automatic time stepping, full Newton-Raphson, and configurable substep limits. In geometric nonlinear analysis, compliance depends on load; the example is valid only for the configured 10 N without regenerating and refitting.
 
-## Main findings and limits
+## Results status
 
-The quadratic response surface had the lowest Dataset A five-fold CV MAPE (0.0053%), followed by the Gaussian process (0.0195%) and mechanics-informed regression (0.1083%). On the same-layup material-transfer sets, informative two-point calibration greatly reduced held-out error. One random material-extrapolation pair could not distinguish carbon from glass stiffness effects: both calibration cases had 32 plies and differed only in width, producing a rank-deficient mechanics calibration. This motivates selecting calibration cases based on sensitivity and checking Jacobian conditioning.
+The checked-in numerical results in [the dated report](docs/extended_transfer_results_report_2026-10-22.md) were produced by the **previous linear-static formulation**. They are historical baseline results, not validation of the newly configured large-deflection solver. The nonlinear 160-case sweep has not yet been run. Do not use the old CSVs as nonlinear output; the new default output directory is `results/property_transfer_large_deflection/`, and resume validation checks that case definitions match.
 
-The linear-static runs include cases with large deflection relative to length: the maximum target `|delta|/L` is 1.70, and 21/80 targets exceed 0.1. Those cases reproduce the linear FEA result but do not support a small-deflection physical interpretation. The material cards are illustrative assumptions; the mesh and solver setup require verification. Dynamic landing, failure, impact-energy absorption, physical testing and curved-gear optimization remain outside the demonstrated scope.
-
-## Run the extended study
-
-Requires Python dependencies, PyMAPDL and a licensed local MAPDL installation. In PowerShell at the repository root:
+The updated source and focused tests are on branch `feat/large-deflection-transfer-study`. After updating your checkout, run from the repository root in PowerShell:
 
 ```powershell
+python -m unittest discover -s tests -v
 python src/run_extended_transfer_study.py --stage design
-python src/run_extended_transfer_study.py --stage dataset-a
-python src/run_extended_transfer_study.py --stage targets
-python src/run_extended_transfer_study.py --stage fit
+python src/run_extended_transfer_study.py --stage dataset-a --max-cases 1
+python src/run_extended_transfer_study.py --stage targets --max-cases 1
 ```
 
-Use `--stage dataset-a --max-cases 1` or `--stage targets --max-cases 1` to smoke-test MAPDL startup first. See the experiment guide for resume behavior and output details.
+The one-case commands check MAPDL startup. Then run the complete FEA and model workflow:
+
+```powershell
+python src/run_extended_transfer_study.py --stage all
+```
+
+A licensed local MAPDL installation and the Python dependencies in `requirements.txt` are required. Full-run timing, nonlinear convergence, reaction balance, and mesh verification must be assessed from that installation before interpreting new prediction metrics.
 
 ## Earlier project work
 
-Earlier analytical-benchmark, mesh-convergence and hidden-property studies remain in the repository history and prior results folders. Their configurations and metrics differ from this extended experiment and should be cited separately.
+Earlier analytical-beam, mesh-convergence, and hidden-property studies remain available in the repository history and result folders. Their assumptions and metrics differ and should be cited separately.

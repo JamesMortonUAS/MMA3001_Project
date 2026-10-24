@@ -19,30 +19,90 @@
     "maximum_equilibrium_iterations": 50
   },
   "dataset_a": {
-    "widths_m": [0.02, 0.04, 0.06, 0.08, 0.10],
-    "ply_counts": [8, 16, 24, 32],
-    "stiffness_scale_pairs": [[1.0, 1.0], [1.0, 2.0], [2.0, 1.0], [2.0, 2.0]]
+    "widths_m": [
+      0.02,
+      0.04,
+      0.06,
+      0.08,
+      0.1
+    ],
+    "ply_counts": [
+      8,
+      16,
+      24,
+      32
+    ],
+    "stiffness_scale_pairs": [
+      [
+        1.0,
+        1.0
+      ],
+      [
+        1.0,
+        2.0
+      ],
+      [
+        2.0,
+        1.0
+      ],
+      [
+        2.0,
+        2.0
+      ]
+    ]
   },
   "targets": {
-    "material_interpolation": {"kind": "tw_glass", "carbon_scale": 1.5, "glass_scale": 1.5},
-    "material_extrapolation": {"kind": "tw_glass", "carbon_scale": 2.25, "glass_scale": 0.75},
-    "layup_transfer": {"kind": "ud_tw_glass", "carbon_scale": 1.0, "glass_scale": 1.0},
+    "material_interpolation": {
+      "kind": "tw_glass",
+      "carbon_scale": 1.5,
+      "glass_scale": 1.5
+    },
+    "material_extrapolation": {
+      "kind": "tw_glass",
+      "carbon_scale": 2.25,
+      "glass_scale": 0.75
+    },
+    "layup_transfer": {
+      "kind": "ud_tw_glass",
+      "carbon_scale": 1.0,
+      "glass_scale": 1.0
+    },
     "geometry_extrapolation": {
       "kind": "tw_glass",
       "carbon_scale": 1.0,
       "glass_scale": 1.0,
-      "widths_m": [0.015, 0.04, 0.06, 0.08, 0.15],
-      "ply_counts": [8, 16, 32, 100]
+      "widths_m": [
+        0.015,
+        0.04,
+        0.06,
+        0.08,
+        0.15
+      ],
+      "ply_counts": [
+        8,
+        16,
+        32,
+        100
+      ]
+    },
+    "material_extrapolation_v2": {
+      "kind": "tw_glass",
+      "carbon_scale": 2.25,
+      "glass_scale": 0.75,
+      "resin_to_fibre_ratio_multiplier": 2.0
     }
   },
   "calibration": {
     "repeats": 3,
     "points_per_repeat": 2,
     "seed": 93017,
-    "material_scale_bounds": [0.4, 3.0]
+    "material_scale_bounds": [
+      0.4,
+      3.0
+    ]
   },
   "models": {
-    "quadratic_ridge_alpha": 1e-8,
+    "quadratic_ridge_alpha": 1e-08,
     "gp_restarts": 2
   },
   "materials": {
@@ -79,14 +139,25 @@
       "EX_Pa": 135000000000.0,
       "EY_Pa": 8500000000.0,
       "EZ_Pa": 8500000000.0,
-      "PRXY": 0.30,
-      "PRYZ": 0.40,
-      "PRXZ": 0.30,
+      "PRXY": 0.3,
+      "PRYZ": 0.4,
+      "PRXZ": 0.3,
       "GXY_Pa": 5000000000.0,
       "GYZ_Pa": 3000000000.0,
       "GXZ_Pa": 5000000000.0,
       "density_kg_m3": 1600.0,
       "family": "carbon"
     }
+  },
+  "resin_model": {
+    "baseline_resin_volume_fraction": 0.5,
+    "matrix_modulus_Pa": 3000000000.0,
+    "matrix_poisson_ratio": 0.35,
+    "density_and_ply_thickness_fixed": true,
+    "baseline_fraction_note": "Illustrative baseline: 50 vol% resin for the current effective ply cards; CF twill midpoint of cited woven-laminate fibre fractions, GF assumed at the same level.",
+    "ratio_definition": "Multiplier applies to baseline resin-to-fibre volume ratio; resulting resin fraction is normalized to total volume.",
+    "matrix_reference": "Westlake Epoxy EPIKOTE MGS LR285 technical data sheet (typical cured tensile modulus 3.0 GPa, cured density 1.19 g/cm^3); nu=0.35 is an illustrative assumption.",
+    "density_reference_url": "https://shop.swiss-composite.ch/shop/resources/downloads/110_1051/t-Epoxyd-Harz-L-285-LF-e.pdf",
+    "baseline_fraction_reference_url": "https://www.revchem.com/document/15pc135966a_tds-pdf/"
   }
 }

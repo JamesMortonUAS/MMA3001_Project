@@ -85,7 +85,14 @@ python src/run_extended_transfer_study.py --stage fit
 
 Or run the entire sequence with `--stage all`. If a simulation run stops, the FEA stages read completed case IDs from their CSV and skip those cases when resumed. Keep the config and solver logs with the output. To change output location, pass `--output-dir results/my_run`.
 
-The runner includes the effective bending/shear calculation it needs and does not import the legacy `laminate_section.py` module. The archived baseline `run_property_transfer_study.py` is not invoked. To smoke-test MAPDL before a full run, use `--stage dataset-a --max-cases 1`; the same option works for `--stage targets`. Then rerun that stage without `--max-cases` to finish the remaining cases. Do not use `--max-cases` with `--stage all`, because model fitting requires the complete datasets.
+The runner includes the effective bending/shear calculation it needs and does not import the legacy `laminate_section.py` module. The archived baseline `run_property_transfer_study.py` is not invoked. Smoke-test one Dataset A case and one Set 5 case before the full run:
+
+```powershell
+python src/run_extended_transfer_study.py --stage dataset-a --max-cases 1
+python src/run_extended_transfer_study.py --stage targets --target-set material_extrapolation_v2 --max-cases 1
+```
+
+Then run `python src/run_extended_transfer_study.py --stage all`. The runner resumes completed case IDs from the same output folder, so it will keep the smoke-tested Set 5 case and run the remaining cases. Do not use `--max-cases` with `--stage all`, because model fitting requires the complete datasets.
 
 ### Accepted input domain and failure handling
 

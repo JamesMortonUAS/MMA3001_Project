@@ -394,6 +394,7 @@ def _case_signature(cfg: dict, row: dict) -> str:
     """Hash the full FEA definition and case design to prevent stale resume."""
     payload = {
         "beam": cfg["beam"], "mesh": cfg["mesh"], "solver": cfg["solver"],
+        "solver_command_semantics": "NSUBST_initial_max_min;POST1_SET_LAST_v2",
         "resin_model": cfg["resin_model"],
         "materials": cfg["materials"], "case": row,
     }

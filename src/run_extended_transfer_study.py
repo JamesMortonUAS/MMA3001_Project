@@ -17,10 +17,12 @@ from __future__ import annotations
 
 import argparse
 import copy
+import hashlib
 import itertools
 import json
 import math
 from pathlib import Path
+from time import perf_counter
 
 import joblib
 import numpy as np
@@ -35,7 +37,7 @@ from sklearn.preprocessing import PolynomialFeatures, StandardScaler
 from sklearn.model_selection import KFold
 from sklearn.base import clone
 
-BASE_DIR = Path("results/property_transfer_extended")
+BASE_DIR = Path("results/property_transfer_large_deflection")
 ORTHO_FIELDS = {
     "EX_Pa": "EX", "EY_Pa": "EY", "EZ_Pa": "EZ",
     "PRXY": "PRXY", "PRYZ": "PRYZ", "PRXZ": "PRXZ",
@@ -97,27 +99,103 @@ def model_inputs(frame: pd.DataFrame) -> np.ndarray:
 
 
 def validate_config(cfg: dict) -> None:
-    """Check the factors that determine sweep size and valid stacks."""
-    if len(cfg["dataset_a"]["widths_m"]) != 5:
-        raise ValueError("Dataset A requires five width levels")
-    if cfg["dataset_a"]["ply_counts"] != [8, 16, 24, 32]:
-        raise ValueError("Dataset A ply counts must be [8, 16, 24, 32]")
-    if len(cfg["dataset_a"]["stiffness_scale_pairs"]) != 4:
-        raise ValueError("Dataset A requires four carbon/glass scale pairs")
+    """Validate the supported input domain before generating designs or solving.
+
+    Supported runs use positive finite SI dimensions and loads, even ply counts,
+    zero-degree plies, the two built-in stack families, and large-deflection
+    static MAPDL analysis. The example design is capped at 100 plies.
+    """
+    required_sections = {"beam", "mesh", "dataset_a", "targets", "calibration", "models", "materials", "solver"}
+    missing_sections = required_sections - set(cfg)
+    if missing_sections:
+        raise ValueError(f"Configuration missing sections: {sorted(missing_sections)}")
+
+    beam = cfg["beam"]
+    for key in ("length_m", "tip_load_N", "shear_correction_factor"):
+        value = float(beam[key])
+        if not math.isfinite(value) or value <= 0:
+            raise ValueError(f"beam.{key} must be positive and finite")
+    mesh = cfg["mesh"]
+    for key in ("nx", "ny", "integration_points_per_ply", "nproc"):
+        if int(mesh[key]) < 1:
+            raise ValueError(f"mesh.{key} must be a positive integer")
+
+    train = cfg["dataset_a"]
+    widths = [float(v) for v in train["widths_m"]]
+    if len(widths) != 5 or len(set(widths)) != 5 or any(not math.isfinite(v) or v <= 0 for v in widths):
+        raise ValueError("dataset_a.widths_m must contain five unique positive finite widths in metres")
+    if train["ply_counts"] != [8, 16, 24, 32]:
+        raise ValueError("dataset_a.ply_counts must be [8, 16, 24, 32]")
+    expected_pairs = [[1.0, 1.0], [1.0, 2.0], [2.0, 1.0], [2.0, 2.0]]
+    if train["stiffness_scale_pairs"] != expected_pairs:
+        raise ValueError(f"dataset_a.stiffness_scale_pairs must be {expected_pairs}")
+
+    solver = cfg["solver"]
+    if solver.get("large_deflection") is not True:
+        raise ValueError("solver.large_deflection must be true for this study")
+    if solver.get("automatic_time_stepping") is not True:
+        raise ValueError("solver.automatic_time_stepping must be true for nonlinear static solving")
+    n0, nmin, nmax = (int(solver[k]) for k in ("initial_substeps", "minimum_substeps", "maximum_substeps"))
+    if not (1 <= nmin <= n0 <= nmax):
+        raise ValueError("Solver substeps must satisfy 1 <= minimum <= initial <= maximum")
+    if int(solver["maximum_equilibrium_iterations"]) < 1:
+        raise ValueError("solver.maximum_equilibrium_iterations must be positive")
+
+    calibration = cfg["calibration"]
+    if int(calibration["repeats"]) < 1 or int(calibration["points_per_repeat"]) < 2:
+        raise ValueError("Calibration requires at least one repeat and at least two observations per repeat")
+    scale_bounds = [float(v) for v in calibration["material_scale_bounds"]]
+    if len(scale_bounds) != 2 or not (0 < scale_bounds[0] < scale_bounds[1]):
+        raise ValueError("calibration.material_scale_bounds must be two positive increasing values")
+
+    if set(cfg["targets"]) != {"material_interpolation", "material_extrapolation", "layup_transfer", "geometry_extrapolation"}:
+        raise ValueError("targets must define all four supported target sets")
+    for name, target in cfg["targets"].items():
+        if target["kind"] not in {"tw_glass", "ud_tw_glass"}:
+            raise ValueError(f"targets.{name}.kind is unsupported: {target['kind']}")
+        for key in ("carbon_scale", "glass_scale"):
+            value = float(target[key])
+            if not math.isfinite(value) or value <= 0:
+                raise ValueError(f"targets.{name}.{key} must be positive and finite")
+            if not scale_bounds[0] <= value <= scale_bounds[1]:
+                raise ValueError(f"targets.{name}.{key} must lie within calibration.material_scale_bounds")
+        if name == "geometry_extrapolation":
+            geo_widths = [float(v) for v in target["widths_m"]]
+            geo_plies = [int(v) for v in target["ply_counts"]]
+            if any(float(raw) != cast for raw, cast in zip(target["ply_counts"], geo_plies)):
+                raise ValueError("geometry_extrapolation.ply_counts must be integer values")
+            if len(geo_widths) != 5 or any(not math.isfinite(v) or v <= 0 for v in geo_widths):
+                raise ValueError("geometry_extrapolation.widths_m must contain five positive finite widths")
+            if any(v < 2 or v > 100 or v % 2 for v in geo_plies):
+                raise ValueError("geometry_extrapolation.ply_counts must be even integers from 2 to 100")
+
     for name, card in cfg["materials"].items():
         required = {"ply_thickness_m", "family", *ORTHO_FIELDS}
         missing = required - set(card)
         if missing:
             raise ValueError(f"Material {name} is missing {sorted(missing)}")
-        if float(card["ply_thickness_m"]) <= 0:
-            raise ValueError(f"Material {name} ply thickness must be positive")
+        if card["family"] not in {"carbon", "glass"}:
+            raise ValueError(f"Material {name}.family must be carbon or glass")
+        for key in ("ply_thickness_m", "density_kg_m3", "EX_Pa", "EY_Pa", "EZ_Pa", "GXY_Pa", "GYZ_Pa", "GXZ_Pa"):
+            value = float(card[key])
+            if not math.isfinite(value) or value <= 0:
+                raise ValueError(f"Material {name}.{key} must be positive and finite")
+        for key in ("PRXY", "PRYZ", "PRXZ"):
+            value = float(card[key])
+            if not math.isfinite(value) or not -0.99 < value < 0.99:
+                raise ValueError(f"Material {name}.{key} must be finite and between -0.99 and 0.99")
 
 
 def symmetric_stack(kind: str, ply_count: int) -> list[str]:
     """Build a symmetric, bottom-to-top stack from a repeating half-stack."""
     if ply_count <= 0 or ply_count % 2:
         raise ValueError("Symmetric stacks require a positive, even ply count")
-    cycle = ["CF_TWILL", "GF"] if kind == "tw_glass" else ["CF_UD", "CF_TWILL", "GF"]
+    if kind == "tw_glass":
+        cycle = ["CF_TWILL", "GF"]
+    elif kind == "ud_tw_glass":
+        cycle = ["CF_UD", "CF_TWILL", "GF"]
+    else:
+        raise ValueError(f"Unsupported stack kind: {kind}")
     half = [cycle[i % len(cycle)] for i in range(ply_count // 2)]
     full = half + list(reversed(half))
     if full != list(reversed(full)) or len(full) != ply_count:
@@ -218,11 +296,41 @@ def section_data(cfg: dict, row: dict, carbon_scale: float | None = None,
 
 
 def _node_id(i: int, j: int, ny: int) -> int:
+    """Return the deterministic MAPDL node number for grid indices ``i, j``."""
     return i * (ny + 1) + j + 1
+
+
+def configure_large_deflection(mapdl, cfg: dict) -> None:
+    """Activate nonlinear geometric static solution controls in MAPDL."""
+    solver = cfg["solver"]
+    if solver.get("large_deflection") is not True:
+        raise ValueError("This runner requires solver.large_deflection=true")
+    mapdl.run("NLGEOM,ON")
+    mapdl.run("AUTOTS,ON")
+    mapdl.run(
+        f"NSUBST,{int(solver['initial_substeps'])},"
+        f"{int(solver['minimum_substeps'])},{int(solver['maximum_substeps'])}"
+    )
+    mapdl.run(f"NEQIT,{int(solver['maximum_equilibrium_iterations'])}")
+    mapdl.run("NROPT,FULL")
+
+
+def _case_signature(cfg: dict, row: dict) -> str:
+    """Hash the full FEA definition and case design to prevent stale resume."""
+    payload = {
+        "beam": cfg["beam"], "mesh": cfg["mesh"], "solver": cfg["solver"],
+        "materials": cfg["materials"], "case": row,
+    }
+    encoded = json.dumps(
+        payload, sort_keys=True, separators=(",", ":"), allow_nan=False,
+        default=lambda value: value.item() if isinstance(value, np.generic) else str(value),
+    ).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
 
 
 def solve_shell_case(mapdl, cfg: dict, row: dict) -> dict:
     """Solve one generic symmetric layered shell cantilever in MAPDL."""
+    started = perf_counter()
     cards = copy.deepcopy(cfg["materials"])
     cscale = float(row.get("carbon_scale_truth", row.get("carbon_scale", 1.0)))
     gscale = float(row.get("glass_scale_truth", row.get("glass_scale", 1.0)))
@@ -268,6 +376,7 @@ def solve_shell_case(mapdl, cfg: dict, row: dict) -> dict:
     mapdl.finish()
     mapdl.slashsolu()
     mapdl.antype("STATIC")
+    configure_large_deflection(mapdl, cfg)
     for node in roots:
         mapdl.d(node, "ALL", 0.0)
     for node in tips:
@@ -284,6 +393,8 @@ def solve_shell_case(mapdl, cfg: dict, row: dict) -> dict:
         "compliance_m_per_N": abs(uz) / load,
         "max_deflection_over_length": abs(uz) / length,
         "tip_load_N": load, "nx": nx, "ny": ny,
+        "analysis_formulation": "large_deflection_static",
+        "fea_runtime_s": perf_counter() - started,
         "ply_count": len(stack),
         "ply_sequence_bottom_to_top": "-".join(stack),
     }
@@ -293,11 +404,29 @@ def run_fea(cfg: dict, design: pd.DataFrame, output: Path,
             dataset: str, max_cases: int | None = None) -> None:
     """Run/resume a dataset and persist each completed case immediately."""
     from ansys.mapdl.core import launch_mapdl
+    validate_config(cfg)
     output.parent.mkdir(parents=True, exist_ok=True)
     done = {}
     if output.exists():
         prior = pd.read_csv(output)
         if "case_id" in prior:
+            if "analysis_signature" not in prior or "analysis_formulation" not in prior:
+                raise ValueError(
+                    f"Refusing to resume {output}: it lacks the large-deflection analysis signature. "
+                    "Use a new output directory; old linear-static results cannot be reused."
+                )
+            expected = {
+                int(row["case_id"]): _case_signature(cfg, row)
+                for row in design.to_dict(orient="records")
+            }
+            for prior_row in prior.to_dict(orient="records"):
+                cid = int(prior_row["case_id"])
+                if (prior_row["analysis_formulation"] != "large_deflection_static"
+                        or prior_row["analysis_signature"] != expected.get(cid)):
+                    raise ValueError(
+                        f"Refusing to resume {output}: case {cid} was generated with a different "
+                        "FEA definition. Choose a fresh output directory."
+                    )
             done = {int(r["case_id"]): r for r in prior.to_dict(orient="records")}
     mapdl = launch_mapdl(nproc=int(cfg["mesh"].get("nproc", 2)))
     try:
@@ -307,51 +436,65 @@ def run_fea(cfg: dict, design: pd.DataFrame, output: Path,
             if cid in done:
                 continue
             solved = solve_shell_case(mapdl, cfg, row)
-            record = {**row, **solved}
+            record = {**row, **solved, "analysis_signature": _case_signature(cfg, row)}
             done[cid] = record
             pd.DataFrame(done.values()).sort_values("case_id").to_csv(output, index=False)
             print(f"{dataset} case {cid:03d}: width={row['width_m']:.4f} m, "
                   f"plies={row['ply_count']}, h={solved['total_thickness_m']*1e3:.3f} mm, "
-                  f"C={solved['compliance_m_per_N']:.6e} m/N")
+                  f"C={solved['compliance_m_per_N']:.6e} m/N, "
+                  f"time={solved['fea_runtime_s']:.2f} s")
     finally:
         mapdl.exit()
     print(f"Saved {len(done)} {dataset} cases to {output}")
 
 
 def mechanics_matrix(frame: pd.DataFrame, length: float) -> np.ndarray:
+    """Build bending and shear compliance basis columns for each beam case."""
     return np.column_stack((
         length**3 / (3 * frame["EI_Nm2"].to_numpy(float)),
         length / frame["kGA_N"].to_numpy(float),
     ))
 
 
-def fit_models(data_a: pd.DataFrame, cfg: dict) -> dict:
-    """Fit all three model families using Dataset A only."""
+def fit_models(data_a: pd.DataFrame, cfg: dict,
+               runtime_seconds: dict[str, float] | None = None) -> dict:
+    """Fit all model families on Dataset A and optionally record wall time."""
     y = data_a["compliance_m_per_N"].to_numpy(float)
     if np.any(y <= 0):
         raise ValueError("Compliance must be positive")
     length = float(cfg["beam"]["length_m"])
+    started = perf_counter()
     mech = LinearRegression(fit_intercept=False, positive=True).fit(mechanics_matrix(data_a, length), y)
+    if runtime_seconds is not None:
+        runtime_seconds["mechanics"] = perf_counter() - started
     x = model_inputs(data_a)
     logy = np.log(y)
+    started = perf_counter()
     quad = make_pipeline(StandardScaler(), PolynomialFeatures(degree=2, include_bias=False),
                          Ridge(alpha=float(cfg["models"].get("quadratic_ridge_alpha", 1e-8))))
     quad.fit(x, logy)
+    if runtime_seconds is not None:
+        runtime_seconds["quadratic"] = perf_counter() - started
+    started = perf_counter()
     kernel = ConstantKernel(1.0, (1e-3, 1e3)) * Matern(length_scale=np.ones(len(FEATURES)), nu=2.5) + WhiteKernel(noise_level=1e-5)
     gp = make_pipeline(StandardScaler(), GaussianProcessRegressor(
         kernel=kernel, normalize_y=True, n_restarts_optimizer=int(cfg["models"].get("gp_restarts", 2)),
         random_state=int(cfg["calibration"]["seed"])))
     gp.fit(x, logy)
+    if runtime_seconds is not None:
+        runtime_seconds["gaussian_process"] = perf_counter() - started
     return {"mechanics": mech, "quadratic": quad, "gaussian_process": gp}
 
 
 def cross_validated_training_metrics(data_a: pd.DataFrame, cfg: dict,
-                                     models: dict) -> dict:
+                                     models: dict,
+                                     runtime_seconds: dict[str, float] | None = None) -> dict:
     """Five-fold CV predictions on Dataset A; no target data enters model selection."""
     folds = KFold(n_splits=5, shuffle=True, random_state=int(cfg["calibration"]["seed"]))
     y = data_a["compliance_m_per_N"].to_numpy(float)
     results = {}
     for name, prototype in models.items():
+        started = perf_counter()
         pred = np.empty_like(y)
         for train_ix, test_ix in folds.split(data_a):
             fitted = clone(prototype)
@@ -367,16 +510,20 @@ def cross_validated_training_metrics(data_a: pd.DataFrame, cfg: dict,
                            np.log(train["compliance_m_per_N"].to_numpy(float)))
                 pred[test_ix] = np.exp(np.clip(fitted.predict(model_inputs(test)), -50, 50))
         results[name] = metrics(y, pred)
+        if runtime_seconds is not None:
+            runtime_seconds[name] = perf_counter() - started
     return results
 
 
 def predict(model_name: str, model, frame: pd.DataFrame, cfg: dict) -> np.ndarray:
+    """Predict positive compliance using a fitted model and case properties."""
     if model_name == "mechanics":
         return np.maximum(model.predict(mechanics_matrix(frame, float(cfg["beam"]["length_m"]))), 1e-15)
     return np.exp(np.clip(model.predict(model_inputs(frame)), -50, 50))
 
 
 def metrics(y: np.ndarray, pred: np.ndarray) -> dict:
+    """Return sample count, absolute-error scores, MAPE and coefficient of determination."""
     ape = 100 * np.abs(pred-y) / np.maximum(np.abs(y), 1e-15)
     return {
         "n": int(len(y)), "rmse_m_per_N": float(np.sqrt(mean_squared_error(y, pred))),
@@ -388,6 +535,7 @@ def metrics(y: np.ndarray, pred: np.ndarray) -> dict:
 
 def generate_features_for_scales(cfg: dict, target_row: dict,
                                  cscale: float, gscale: float) -> dict:
+    """Recompute a target case's effective section predictors at candidate scales."""
     row = {**target_row, "carbon_scale_truth": cscale, "glass_scale_truth": gscale}
     props = section_data(cfg, row, cscale, gscale)
     return {**target_row, **props}
@@ -397,7 +545,8 @@ def fit_evaluate(cfg: dict, a_path: Path, target_path: Path, out_dir: Path) -> d
     """Fit on Dataset A and evaluate repeated two-case calibration per target set."""
     data_a = pd.read_csv(a_path)
     target_data = pd.read_csv(target_path)
-    models = fit_models(data_a, cfg)
+    fit_runtime = {}
+    models = fit_models(data_a, cfg, fit_runtime)
     out_dir.mkdir(parents=True, exist_ok=True)
     for name, model in models.items():
         joblib.dump(model, out_dir / f"model_{name}.joblib")
@@ -405,13 +554,14 @@ def fit_evaluate(cfg: dict, a_path: Path, target_path: Path, out_dir: Path) -> d
     for name, model in models.items():
         train_metrics[name] = metrics(data_a["compliance_m_per_N"].to_numpy(float),
                                       predict(name, model, data_a, cfg))
-    cv_metrics = cross_validated_training_metrics(data_a, cfg, models)
+    cv_runtime = {}
+    cv_metrics = cross_validated_training_metrics(data_a, cfg, models, cv_runtime)
 
     rng = np.random.default_rng(int(cfg["calibration"]["seed"]))
     n_repeats = int(cfg["calibration"]["repeats"])
     n_cal = int(cfg["calibration"]["points_per_repeat"])
     bounds = cfg["calibration"]["material_scale_bounds"]
-    result_rows, metric_rows, split_rows = [], [], []
+    result_rows, metric_rows, split_rows, target_runtime_rows = [], [], [], []
     for set_name, group in target_data.groupby("target_set", sort=False):
         group = group.sort_values("case_id").reset_index(drop=True)
         if len(group) <= n_cal:
@@ -425,6 +575,7 @@ def fit_evaluate(cfg: dict, a_path: Path, target_path: Path, out_dir: Path) -> d
             cal_mask = np.zeros(len(group), dtype=bool)
             cal_mask[chosen] = True
             for model_name, model in models.items():
+                evaluation_started = perf_counter()
                 nominal_frame = pd.DataFrame([
                     generate_features_for_scales(cfg, r, 1.0, 1.0)
                     for r in group.to_dict(orient="records")
@@ -452,6 +603,10 @@ def fit_evaluate(cfg: dict, a_path: Path, target_path: Path, out_dir: Path) -> d
                     for r in group.to_dict(orient="records")
                 ])
                 pred_fit = predict(model_name, model, fitted_frame, cfg)
+                target_runtime_rows.append({
+                    "target_set": set_name, "repeat": repeat + 1, "model": model_name,
+                    "calibration_and_prediction_runtime_s": perf_counter() - evaluation_started,
+                })
                 valid = ~cal_mask
                 region_masks = {"all_validation": valid}
                 if "width_region" in group:
@@ -490,9 +645,22 @@ def fit_evaluate(cfg: dict, a_path: Path, target_path: Path, out_dir: Path) -> d
     pd.DataFrame(result_rows).to_csv(out_dir / "predictions.csv", index=False)
     pd.DataFrame(metric_rows).to_csv(out_dir / "metrics_by_repeat.csv", index=False)
     pd.DataFrame(split_rows).to_csv(out_dir / "calibration_splits.csv", index=False)
+    target_runtime = pd.DataFrame(target_runtime_rows)
+    runtime_summary = target_runtime.groupby("model")["calibration_and_prediction_runtime_s"].agg(
+        calibration_prediction_mean_s="mean", calibration_prediction_sd_s="std"
+    ).fillna(0.0)
+    runtime_table = pd.DataFrame({
+        "model": list(models),
+        "fit_runtime_s": [fit_runtime[name] for name in models],
+        "five_fold_cv_runtime_s": [cv_runtime[name] for name in models],
+    }).set_index("model").join(runtime_summary).reset_index()
+    runtime_table.to_csv(out_dir / "runtime_by_model.csv", index=False)
+    target_runtime.to_csv(out_dir / "runtime_by_repeat.csv", index=False)
     summary = {
         "training_model_metrics": train_metrics,
         "training_fivefold_cv_metrics": cv_metrics,
+        "runtime_by_model": runtime_table.to_dict(orient="records"),
+        "fea_runtime_column": "fea_runtime_s (seconds per case; recorded in dataset_A.csv and targets.csv)",
         "experiment": {"dataset_a_cases": int(len(data_a)), "target_cases": int(len(target_data)),
                        "calibration_repeats": n_repeats, "calibration_points": n_cal},
         "calibration_warning": "Two points are the algebraic minimum for two factors. Inspect Jacobian rank and condition number before interpreting factors.",
@@ -502,6 +670,7 @@ def fit_evaluate(cfg: dict, a_path: Path, target_path: Path, out_dir: Path) -> d
 
 
 def main() -> None:
+    """Parse the CLI, validate inputs, and run selected design/FEA/model stages."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", default="config.extended_transfer.example.json")
     parser.add_argument("--output-dir", default=str(BASE_DIR))

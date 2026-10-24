@@ -1,6 +1,6 @@
 # Extended transfer experiment: run guide
 
-This branch adds a new controlled FEA-to-FEA study. It does not replace the completed 97-case study or alter its scripts/results. The expanded run contains 80 Dataset A simulations and 80 target simulations. Three calibration repeats reuse target cases; they do not create additional FEA jobs.
+This study contains 80 Dataset A simulations and 80 target simulations. Three calibration repeats reuse target cases; they do not create additional FEA jobs. The current runner uses a nonlinear large-deflection static formulation. Earlier CSVs in `results/property_transfer_extended/` were generated with a linear-static formulation and are retained as a historical baseline only. They are not results for the current formulation. The new default output directory is `results/property_transfer_large_deflection/`, and the runner refuses to resume an output file whose case signature does not match the current FEA inputs.
 
 ## Design
 
@@ -36,9 +36,11 @@ The 100-ply alternating twill/glass geometry has 50 plies of each type and 15 mm
 
 ## FEA definition
 
-The example keeps the benchmark settings for comparability: a 0.25 m straight cantilever, 10 N static tip-edge load, fully fixed root edge and SHELL181 layered shell elements on a structured 40 x 6 mesh. Three through-thickness integration points are assigned to each ply. The output is mean vertical tip displacement and compliance `abs(delta)/P`; each record also includes complete ply sequence, count, total thickness, mass, `D_eff`, `S_eff`, `EI`, `kGA`, normalized displacement and mesh counts.
+The model is a 0.25 m straight cantilever, with a 10 N total transverse force distributed over the free tip edge, a fully fixed root edge, and SHELL181 layered shell elements on a structured 40 x 6 mesh. Three through-thickness integration points are assigned to each ply. MAPDL is set to large-deflection static analysis (`NLGEOM,ON`) with automatic time stepping, 10 initial substeps, 1 to 100 permitted substeps, up to 50 equilibrium iterations per substep, and full Newton-Raphson. This accounts for geometric nonlinearity from large rotations; it does not add material nonlinearity, damage, failure, contact, or dynamics.
 
-This is a 2D shell discretization with a layered section, not a 3D solid analysis. It is a linear-static compliance experiment, not an impact, energy absorption, failure or physical validation study. Check mesh convergence, reactions, shell local axes and normalized displacement before interpreting the sweep. A 100-ply case takes substantially more section data than the shorter stacks and should first be tried as a single smoke-test case if MAPDL runtime or memory is limited.
+The output is mean vertical tip displacement and compliance `abs(delta)/P`. Because the formulation is geometrically nonlinear, compliance can depend on load. The current experiment fixes the force at 10 N and does not claim predictions for another load level; a new load requires regenerating both datasets and refitting. Each record also includes complete ply sequence, count, total thickness, mass, `D_eff`, `S_eff`, `EI`, `kGA`, normalized displacement, mesh counts, and per-case MAPDL wall time `fea_runtime_s`.
+
+This is a 2D shell discretization with a layered section, not a 3D solid analysis. It is a nonlinear static compliance experiment, not an impact, energy absorption, failure or physical validation study. Check mesh convergence, reactions, shell local axes, nonlinear convergence and load-step histories before interpreting the sweep. A 100-ply case takes substantially more section data than the shorter stacks and should first be tried as a single smoke-test case if MAPDL runtime or memory is limited.
 
 ## Models, calibration and validation
 
@@ -74,7 +76,13 @@ Or run the entire sequence with `--stage all`. If a simulation run stops, the FE
 
 The runner includes the effective bending/shear calculation it needs and does not import the legacy `laminate_section.py` module. The archived baseline `run_property_transfer_study.py` is not invoked. To smoke-test MAPDL before a full run, use `--stage dataset-a --max-cases 1`; the same option works for `--stage targets`. Then rerun that stage without `--max-cases` to finish the remaining cases. Do not use `--max-cases` with `--stage all`, because model fitting requires the complete datasets.
 
-Outputs under `results/property_transfer_extended/`:
+### Accepted input domain and failure handling
+
+The JSON configuration uses SI units. The supported design has a positive finite beam length and fixed positive tip load; five unique positive Dataset A widths; Dataset A ply counts exactly 8, 16, 24, and 32; and the four carbon/glass scale pairs `(1,1)`, `(1,2)`, `(2,1)`, `(2,2)`. The geometry target accepts five positive widths and even ply counts from 2 through 100. The current example uses 0.25 m length and 10 N. Material cards require positive finite ply thickness, density, elastic and shear moduli, carbon/glass family labels, and bounded finite Poisson ratios. Only the `tw_glass` and `ud_tw_glass` stack families and zero-degree plies are supported.
+
+Large-deflection mode and automatic time stepping must be enabled. Calibration requires at least one repeat, at least two observations, and positive increasing scale bounds; target factors must be within those bounds. Invalid or missing required values fail before MAPDL is launched. Unsupported layup family, odd ply count, or nonzero orientation raises a clear error. Reusing a CSV from another FEA definition raises an error and requires a fresh output directory. In particular, the previous linear-static CSVs cannot be resumed as nonlinear results.
+
+Outputs by default under `results/property_transfer_large_deflection/`:
 
 - `dataset_A_design.csv` and `target_design.csv`: planned cases, scale factors and full bottom-to-top layup strings.
 - `dataset_A.csv` and `targets.csv`: FEA responses and effective section/mass properties.
@@ -82,13 +90,19 @@ Outputs under `results/property_transfer_extended/`:
 - `model/calibration_splits.csv`: the three paired calibration selections per target set.
 - `model/predictions.csv`: per-case nominal and corrected predictions for each model/repeat.
 - `model/metrics_by_repeat.csv`: held-out scores and calibration diagnostics.
+- `model/runtime_by_model.csv`: model fit time, five-fold CV time, and mean calibration/prediction time.
+- `model/runtime_by_repeat.csv`: calibration/prediction wall time for each target set and repeat.
 - `model/summary.json`: Dataset A cross-validation scores and run counts.
+
+Runtime records are wall-clock measurements from the machine and MAPDL installation used for the run. Compare model timings on the same computer and process state. The model runtime output allows an accuracy-versus-cost comparison; per-case `fea_runtime_s` allows the FEA cost to be compared with surrogate fitting and prediction. Do not substitute timings from the historical linear run for the nonlinear study.
 
 Expected size: 80 training + 80 target FEA cases, or 160 unique analyses. Each target-set calibration/validation cycle has two calibration cases and 18 held-out cases per repeat.
 
 ## Interpretation guardrails
 
 - Dataset A and all targets share the same FE modeling framework; success is FEA-to-FEA transfer only.
+- The mechanics-informed bending/shear basis is derived from small-deflection beam theory; with NLGEOM targets it is a comparison baseline, not an exact nonlinear mechanics solution.
+- Compliance is load-dependent in a geometrically nonlinear analysis. The model's domain is the single configured load used for both datasets; load variation is unsupported without a new sweep and model fit.
 - Two observations are the algebraic minimum for two fitted property multipliers. A poor Jacobian condition means the pair cannot robustly distinguish their effects.
 - Material interpolation/extrapolation labels refer to the configured stiffness factors. Geometry extrapolation labels are based on width and ply count separately.
 - The new UD card and the other representative material cards are computational assumptions, not validated material data.

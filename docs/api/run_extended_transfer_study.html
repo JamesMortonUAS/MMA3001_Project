@@ -7,8 +7,9 @@ pre{white-space:pre-wrap;background:#f4f6f8;padding:.8rem;border-radius:5px}a{co
 <body><p><a href="index.html">API documentation index</a></p>
 <h1>run_extended_transfer_study</h1><pre>Run the factorial FEA-to-FEA material-transfer experiment.
 
-The script creates an 80-case training grid, four 20-case target sets, and
-compares mechanics-informed, quadratic and Gaussian-process compliance models.
+The script creates an 80-case training grid and five 20-case target sets,
+including a resin-ratio perturbation that is hidden from the prediction model.
+It compares mechanics-informed, quadratic and Gaussian-process compliance models.
 Two target observations estimate carbon/glass stiffness multipliers. Three
 random calibration pairs are reused for every model. Run MAPDL stages with a
 licensed local MAPDL installation.
@@ -34,8 +35,15 @@ zero-degree plies, the two built-in stack families, and large-deflection
 static MAPDL analysis. The example design is capped at 100 plies.</pre></section>
 <section><h2><code>symmetric_stack(kind: str, ply_count: int) -&gt; list[str]</code></h2><pre>Build a symmetric, bottom-to-top stack from a repeating half-stack.</pre></section>
 <section><h2><code>make_designs(cfg: dict) -&gt; tuple[pd.DataFrame, pd.DataFrame]</code></h2><pre>Return training and target design tables with actual stack metadata.</pre></section>
-<section><h2><code>build_layup(cfg: dict, kind: str, ply_count: int, carbon_scale: float=1.0, glass_scale: float=1.0) -&gt; dict</code></h2><pre>Make a generic layup object accepted by the laminate property helper.</pre></section>
-<section><h2><code>section_data(cfg: dict, row: dict, carbon_scale: float | None=None, glass_scale: float | None=None) -&gt; dict</code></h2><pre>Calculate total thickness, mass and CLT section stiffnesses.</pre></section>
+<section><h2><code>_adjust_cards_for_resin_ratio(cfg: dict, resin_ratio_multiplier: float) -&gt; dict</code></h2><pre>Apply an illustrative matrix-rich modulus proxy at fixed ply thickness.
+
+The configured ply cards are treated as effective properties at the
+baseline resin fraction. Their notional fibre contribution is inferred
+with a Voigt mixture, then remixed at the requested resin:fibre ratio.
+Density and Poisson ratios remain fixed; this is a compliance-study proxy,
+not a physical resin-uptake or mass model.</pre></section>
+<section><h2><code>build_layup(cfg: dict, kind: str, ply_count: int, carbon_scale: float=1.0, glass_scale: float=1.0, resin_ratio_multiplier: float=1.0) -&gt; dict</code></h2><pre>Make a generic layup object accepted by the laminate property helper.</pre></section>
+<section><h2><code>section_data(cfg: dict, row: dict, carbon_scale: float | None=None, glass_scale: float | None=None, resin_ratio_multiplier: float | None=None) -&gt; dict</code></h2><pre>Calculate total thickness, mass and CLT section stiffnesses.</pre></section>
 <section><h2><code>_node_id(i: int, j: int, ny: int) -&gt; int</code></h2><pre>Return the deterministic MAPDL node number for grid indices ``i, j``.</pre></section>
 <section><h2><code>configure_large_deflection(mapdl, cfg: dict) -&gt; None</code></h2><pre>Activate nonlinear geometric static solution controls in MAPDL.</pre></section>
 <section><h2><code>_case_signature(cfg: dict, row: dict) -&gt; str</code></h2><pre>Hash the full FEA definition and case design to prevent stale resume.</pre></section>

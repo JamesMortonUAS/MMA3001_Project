@@ -70,7 +70,7 @@ class ExtendedTransferDesignTests(unittest.TestCase):
     cfg = json.loads(CONFIG.read_text())
     a, targets = make_designs(cfg)
     self.assertEqual(len(a), 80)
-    self.assertEqual(len(targets), 80)
+    self.assertEqual(len(targets), 100)
     self.assertEqual(a["width_m"].nunique(), 5)
     self.assertEqual(a["ply_count"].nunique(), 4)
     self.assertEqual(len(a[["carbon_scale", "glass_scale"]].drop_duplicates()), 4)
@@ -79,7 +79,10 @@ class ExtendedTransferDesignTests(unittest.TestCase):
         "material_extrapolation": 20,
         "layup_transfer": 20,
         "geometry_extrapolation": 20,
+        "material_extrapolation_v2": 20,
     })
+    v2 = targets[targets.target_set == "material_extrapolation_v2"]
+    self.assertTrue((v2.resin_to_fibre_ratio_multiplier_truth == 2.0).all())
 
 
   def test_symmetric_stacks_and_nominal_thicknesses(self):
@@ -112,6 +115,19 @@ class ExtendedTransferDesignTests(unittest.TestCase):
     changed = copy.deepcopy(cfg)
     changed["solver"]["maximum_substeps"] = 200
     self.assertNotEqual(signature, _case_signature(changed, row))
+    changed = copy.deepcopy(cfg)
+    changed["resin_model"]["matrix_modulus_Pa"] *= 1.1
+    self.assertNotEqual(signature, _case_signature(changed, row))
+
+  def test_resin_ratio_proxy_changes_truth_stiffness_but_prediction_uses_nominal(self):
+    cfg = json.loads(CONFIG.read_text())
+    _, targets = make_designs(cfg)
+    row = targets[targets.target_set == "material_extrapolation_v2"].iloc[0].to_dict()
+    truth = section_data(cfg, row)
+    nominal = section_data(cfg, row, carbon_scale=2.25, glass_scale=0.75,
+                           resin_ratio_multiplier=1.0)
+    self.assertEqual(truth["resin_to_fibre_ratio_multiplier"], 2.0)
+    self.assertLess(truth["D_eff_Nm_per_m"], nominal["D_eff_Nm_per_m"])
 
   def test_model_fit_and_cross_validation_record_runtime(self):
     import numpy as np

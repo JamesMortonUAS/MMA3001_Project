@@ -1,6 +1,6 @@
 # Extended transfer experiment: run guide
 
-This study contains 80 Dataset A simulations and 80 target simulations. Three calibration repeats reuse target cases; they do not create additional FEA jobs. The current runner uses a nonlinear large-deflection static formulation. Earlier CSVs in `results/property_transfer_extended/` were generated with a linear-static formulation and are retained as a historical baseline only. They are not results for the current formulation. The new default output directory is `results/property_transfer_large_deflection/`, and the runner refuses to resume an output file whose case signature does not match the current FEA inputs.
+This study contains 80 Dataset A simulations and 100 target simulations across five sets. Three calibration repeats reuse target cases; they do not create additional FEA jobs. The current runner uses a nonlinear large-deflection static formulation. Earlier CSVs in `results/property_transfer_extended/` were generated with a linear-static formulation and four target sets; they are historical baseline data only. The new default output directory is `results/property_transfer_large_deflection_5sets/`, and the runner refuses to resume output whose case signature does not match the current FEA inputs.
 
 ## Design
 
@@ -21,7 +21,7 @@ The base half-stack repeats carbon twill (T) and glass (G), then mirrors around 
 
 The carbon scale multiplies all six elastic/shear moduli in each carbon ply material card; the glass scale does the same for glass. Density, Poisson ratios and cured ply thickness do not change. The response model receives calculated laminate bending and transverse-shear properties, not just a single flexural modulus.
 
-There are four 20-case target sets, each using the same 5 widths and 4 ply counts as Dataset A, except for the geometry-extrapolation set:
+There are five 20-case target sets. Sets 1–3 and 5 use the same 5 widths and 4 ply counts as Dataset A, except for the geometry-extrapolation set:
 
 | Target set | Material / geometry change |
 |---|---|
@@ -29,10 +29,21 @@ There are four 20-case target sets, each using the same 5 widths and 4 ply count
 | `material_extrapolation` | Twill/glass stack at factors (2.25, 0.75). |
 | `layup_transfer` | Symmetric repeating CF unidirectional (U), CF twill (T), E-glass (G) half-stack, mirrored; factors (1,1). |
 | `geometry_extrapolation` | Twill/glass stack; widths 0.015, 0.04, 0.06, 0.08, 0.15 m and ply counts 8, 16, 32, 100. |
+| `material_extrapolation_v2` | Twill/glass stack; factors (2.25, 0.75); double the nominal resin-to-fibre volume ratio. |
 
 For layup transfer, the half-stack repeats U-T-G and is truncated to the required half-ply count before mirroring. Carbon UD and twill plies are 0.20 mm; glass plies are 0.10 mm. The UD elastic card in the example configuration is a representative numerical assumption for this method experiment, not a sourced or measured project material specification. Replace it with the desired card before treating results as material predictions.
 
 The 100-ply alternating twill/glass geometry has 50 plies of each type and 15 mm total thickness. Geometry cases are marked separately by whether width and ply count are inside the Dataset A ranges. Thus the extreme 0.015/0.15 m widths and 100-ply cases are explicit extrapolation points.
+
+### Set 5 resin-ratio proxy
+
+The example treats each supplied ply card as an effective lamina at a 50% baseline resin volume fraction. This is an illustrative baseline: 50% is the midpoint of the cited woven-carbon laminate fibre-volume range, and the same baseline is assumed for the glass card. `resin_to_fibre_ratio_multiplier=2` doubles the resin:fibre volume ratio, then renormalizes the two fractions; it changes the resin fraction from 0.50 to 0.667. The matrix proxy uses epoxy tensile modulus 3.0 GPa and Poisson ratio 0.35, giving shear modulus 1.11 GPa. The modulus is taken from a Westlake EPIKOTE resin technical data sheet; Poisson ratio is an explicit assumption.
+
+For each elastic or shear modulus $p_0$ in the configured effective ply card, the code infers a notional fibre contribution $p_f=(p_0-V_{r,0}p_m)/(1-V_{r,0})$ and recombines it as $p=(1-V_r)p_f+V_rp_m$. This simple Voigt mixture is a transparent stiffness perturbation, not a full micromechanics model. Ply thickness, density and Poisson ratios stay fixed; therefore this set tests compliance transfer only and must not be used for mass optimization. The source material cards and the resin proxy are not validated physical properties.
+
+In Set 5, the target FEA uses the 2× resin:fibre ratio and the configured carbon/glass factors. The model is deliberately not told that ratio changed: its nominal section-property features assume a ratio multiplier of 1, and calibration adjusts only the two carbon/glass factors using the two observed compliances. Set 5 therefore tests how the two-factor correction handles an additional unmodelled composition shift; it does not identify or recover the resin ratio.
+
+Sources for illustrative resin assumptions: [Westlake Epoxy EPIKOTE MGS LR285 technical data sheet](https://shop.swiss-composite.ch/shop/resources/downloads/110_1051/t-Epoxyd-Harz-L-285-LF-e.pdf) (typical cured tensile modulus 3.0 GPa, density 1.19 g/cm$^3$); [Gurit SE84LV prepreg data sheet](https://www.revchem.com/document/15pc135966a_tds-pdf/) (woven carbon laminate fibre volume fraction 47–53%).
 
 ## FEA definition
 
@@ -52,7 +63,7 @@ All three models are fit using Dataset A only:
 
 The quadratic and GP models exponentiate their predicted log compliance so their outputs remain positive. Five-fold cross-validation is run on Dataset A. No target-set FEA response enters training or tuning.
 
-For each target set, the script selects two distinct observations randomly and repeats the selection three times. The same case IDs are used for all three model types. Nonlinear least squares estimates two effective property multipliers (carbon and glass) from those two target responses. The remaining 18 cases in that set are held out for validation. The fitted multipliers are not guaranteed to be identifiable: each repeat reports the calibration Jacobian rank and condition number, and flags rank deficiency or a condition number over 1e6. Treat unstable multipliers as evidence about the design, not as recovered physical material constants.
+For each of the five target sets, the script selects two distinct observations randomly and repeats the selection three times. The same case IDs are used for all three model types. Nonlinear least squares estimates two effective property multipliers (carbon and glass) from those two target responses. The remaining 18 cases in that set are held out for validation. Set 5's resin ratio is intentionally omitted from model features and is not fitted. The fitted multipliers are not guaranteed to be identifiable: each repeat reports the calibration Jacobian rank and condition number, and flags rank deficiency or a condition number over 1e6. Treat unstable multipliers as evidence about the design, not as recovered physical material constants.
 
 Metrics are reported before calibration and after calibration, by target set and repeat. In the geometry-extrapolation set they are additionally separated by width and ply-count regions. Validation excludes both calibration cases. Dataset A cross-validation and target validation remain separate results.
 
@@ -74,15 +85,22 @@ python src/run_extended_transfer_study.py --stage fit
 
 Or run the entire sequence with `--stage all`. If a simulation run stops, the FEA stages read completed case IDs from their CSV and skip those cases when resumed. Keep the config and solver logs with the output. To change output location, pass `--output-dir results/my_run`.
 
-The runner includes the effective bending/shear calculation it needs and does not import the legacy `laminate_section.py` module. The archived baseline `run_property_transfer_study.py` is not invoked. To smoke-test MAPDL before a full run, use `--stage dataset-a --max-cases 1`; the same option works for `--stage targets`. Then rerun that stage without `--max-cases` to finish the remaining cases. Do not use `--max-cases` with `--stage all`, because model fitting requires the complete datasets.
+The runner includes the effective bending/shear calculation it needs and does not import the legacy `laminate_section.py` module. The archived baseline `run_property_transfer_study.py` is not invoked. Smoke-test one Dataset A case and one Set 5 case before the full run:
+
+```powershell
+python src/run_extended_transfer_study.py --stage dataset-a --max-cases 1
+python src/run_extended_transfer_study.py --stage targets --target-set material_extrapolation_v2 --max-cases 1
+```
+
+Then run `python src/run_extended_transfer_study.py --stage all`. The runner resumes completed case IDs from the same output folder, so it will keep the smoke-tested Set 5 case and run the remaining cases. Do not use `--max-cases` with `--stage all`, because model fitting requires the complete datasets.
 
 ### Accepted input domain and failure handling
 
-The JSON configuration uses SI units. The supported design has a positive finite beam length and fixed positive tip load; five unique positive Dataset A widths; Dataset A ply counts exactly 8, 16, 24, and 32; and the four carbon/glass scale pairs `(1,1)`, `(1,2)`, `(2,1)`, `(2,2)`. The geometry target accepts five positive widths and even ply counts from 2 through 100. The current example uses 0.25 m length and 10 N. Material cards require positive finite ply thickness, density, elastic and shear moduli, carbon/glass family labels, and bounded finite Poisson ratios. Only the `tw_glass` and `ud_tw_glass` stack families and zero-degree plies are supported.
+The JSON configuration uses SI units. The supported design has a positive finite beam length and fixed positive tip load; five unique positive Dataset A widths; Dataset A ply counts exactly 8, 16, 24, and 32; and the four carbon/glass scale pairs `(1,1)`, `(1,2)`, `(2,1)`, `(2,2)`. The geometry target accepts five positive widths and even ply counts from 2 through 100. The current example uses 0.25 m length and 10 N. Material cards require positive finite ply thickness, density, elastic and shear moduli, carbon/glass family labels, and bounded finite Poisson ratios. The resin proxy requires a baseline fraction between zero and one, positive matrix modulus, and valid matrix Poisson ratio. Only the `tw_glass` and `ud_tw_glass` stack families and zero-degree plies are supported.
 
 Large-deflection mode and automatic time stepping must be enabled. Calibration requires at least one repeat, at least two observations, and positive increasing scale bounds; target factors must be within those bounds. Invalid or missing required values fail before MAPDL is launched. Unsupported layup family, odd ply count, or nonzero orientation raises a clear error. Reusing a CSV from another FEA definition raises an error and requires a fresh output directory. In particular, the previous linear-static CSVs cannot be resumed as nonlinear results.
 
-Outputs by default under `results/property_transfer_large_deflection/`:
+Outputs by default under `results/property_transfer_large_deflection_5sets/`:
 
 - `dataset_A_design.csv` and `target_design.csv`: planned cases, scale factors and full bottom-to-top layup strings.
 - `dataset_A.csv` and `targets.csv`: FEA responses and effective section/mass properties.
@@ -96,7 +114,7 @@ Outputs by default under `results/property_transfer_large_deflection/`:
 
 Runtime records are wall-clock measurements from the machine and MAPDL installation used for the run. Compare model timings on the same computer and process state. The model runtime output allows an accuracy-versus-cost comparison; per-case `fea_runtime_s` allows the FEA cost to be compared with surrogate fitting and prediction. Do not substitute timings from the historical linear run for the nonlinear study.
 
-Expected size: 80 training + 80 target FEA cases, or 160 unique analyses. Each target-set calibration/validation cycle has two calibration cases and 18 held-out cases per repeat.
+Expected size: 80 training + 100 target FEA cases, or 180 unique analyses. Each target-set calibration/validation cycle has two calibration cases and 18 held-out cases per repeat. A complete fit evaluates 5 sets x 3 repeats x 3 model families.
 
 ## Interpretation guardrails
 

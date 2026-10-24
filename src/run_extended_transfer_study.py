@@ -1,7 +1,8 @@
 """Run the factorial FEA-to-FEA material-transfer experiment.
 
-The script creates an 80-case training grid, four 20-case target sets, and
-compares mechanics-informed, quadratic and Gaussian-process compliance models.
+The script creates an 80-case training grid and five 20-case target sets,
+including a resin-ratio perturbation that is hidden from the prediction model.
+It compares mechanics-informed, quadratic and Gaussian-process compliance models.
 Two target observations estimate carbon/glass stiffness multipliers. Three
 random calibration pairs are reused for every model. Run MAPDL stages with a
 licensed local MAPDL installation.
@@ -37,7 +38,7 @@ from sklearn.preprocessing import PolynomialFeatures, StandardScaler
 from sklearn.model_selection import KFold
 from sklearn.base import clone
 
-BASE_DIR = Path("results/property_transfer_large_deflection")
+BASE_DIR = Path("results/property_transfer_large_deflection_5sets")
 ORTHO_FIELDS = {
     "EX_Pa": "EX", "EY_Pa": "EY", "EZ_Pa": "EZ",
     "PRXY": "PRXY", "PRYZ": "PRYZ", "PRXZ": "PRXZ",
@@ -148,8 +149,25 @@ def validate_config(cfg: dict) -> None:
     if len(scale_bounds) != 2 or not (0 < scale_bounds[0] < scale_bounds[1]):
         raise ValueError("calibration.material_scale_bounds must be two positive increasing values")
 
-    if set(cfg["targets"]) != {"material_interpolation", "material_extrapolation", "layup_transfer", "geometry_extrapolation"}:
-        raise ValueError("targets must define all four supported target sets")
+    expected_target_sets = {
+        "material_interpolation", "material_extrapolation", "layup_transfer",
+        "geometry_extrapolation", "material_extrapolation_v2",
+    }
+    if set(cfg["targets"]) != expected_target_sets:
+        raise ValueError(f"targets must define exactly {sorted(expected_target_sets)}")
+    resin_model = cfg.get("resin_model", {})
+    resin_required = {"baseline_resin_volume_fraction", "matrix_modulus_Pa", "matrix_poisson_ratio"}
+    if resin_required - set(resin_model):
+        raise ValueError(f"resin_model missing {sorted(resin_required - set(resin_model))}")
+    baseline_resin_fraction = float(resin_model["baseline_resin_volume_fraction"])
+    if not math.isfinite(baseline_resin_fraction) or not 0 < baseline_resin_fraction < 1:
+        raise ValueError("resin_model.baseline_resin_volume_fraction must be between zero and one")
+    matrix_e = float(resin_model["matrix_modulus_Pa"])
+    if not math.isfinite(matrix_e) or matrix_e <= 0:
+        raise ValueError("resin_model.matrix_modulus_Pa must be positive")
+    matrix_nu = float(resin_model["matrix_poisson_ratio"])
+    if not math.isfinite(matrix_nu) or not -0.99 < matrix_nu < 0.5:
+        raise ValueError("resin_model.matrix_poisson_ratio must be between -0.99 and 0.5")
     for name, target in cfg["targets"].items():
         if target["kind"] not in {"tw_glass", "ud_tw_glass"}:
             raise ValueError(f"targets.{name}.kind is unsupported: {target['kind']}")
@@ -159,6 +177,12 @@ def validate_config(cfg: dict) -> None:
                 raise ValueError(f"targets.{name}.{key} must be positive and finite")
             if not scale_bounds[0] <= value <= scale_bounds[1]:
                 raise ValueError(f"targets.{name}.{key} must lie within calibration.material_scale_bounds")
+        if name == "material_extrapolation_v2":
+            ratio = float(target.get("resin_to_fibre_ratio_multiplier", 0.0))
+            if not math.isfinite(ratio) or ratio <= 0:
+                raise ValueError("targets.material_extrapolation_v2.resin_to_fibre_ratio_multiplier must be positive and finite")
+        elif float(target.get("resin_to_fibre_ratio_multiplier", 1.0)) != 1.0:
+            raise ValueError(f"targets.{name} must use the nominal resin-to-fibre ratio")
         if name == "geometry_extrapolation":
             geo_widths = [float(v) for v in target["widths_m"]]
             geo_plies = [int(v) for v in target["ply_counts"]]
@@ -231,6 +255,7 @@ def make_designs(cfg: dict) -> tuple[pd.DataFrame, pd.DataFrame]:
                 "width_m": float(width), "ply_count": int(nplies),
                 "carbon_scale_truth": float(spec["carbon_scale"]),
                 "glass_scale_truth": float(spec["glass_scale"]),
+                "resin_to_fibre_ratio_multiplier_truth": float(spec.get("resin_to_fibre_ratio_multiplier", 1.0)),
                 "stack_kind": spec["kind"],
                 "ply_sequence_bottom_to_top": "-".join(stack),
             })
@@ -244,18 +269,62 @@ def make_designs(cfg: dict) -> tuple[pd.DataFrame, pd.DataFrame]:
             "width_m": float(width), "ply_count": int(nplies),
             "carbon_scale_truth": float(spec["carbon_scale"]),
             "glass_scale_truth": float(spec["glass_scale"]),
+            "resin_to_fibre_ratio_multiplier_truth": float(spec.get("resin_to_fibre_ratio_multiplier", 1.0)),
             "stack_kind": spec["kind"],
             "ply_sequence_bottom_to_top": "-".join(stack),
             "width_region": "in_range" if training_w[0] <= width <= training_w[1] else "extrapolation",
             "ply_count_region": "in_range" if training_n[0] <= nplies <= training_n[1] else "extrapolation",
         })
+    spec = set_specs["material_extrapolation_v2"]
+    for nplies, width in itertools.product(a["ply_counts"], a["widths_m"]):
+        stack = symmetric_stack(spec["kind"], int(nplies))
+        target_rows.append({
+            "case_id": len(target_rows), "target_set": "material_extrapolation_v2",
+            "width_m": float(width), "ply_count": int(nplies),
+            "carbon_scale_truth": float(spec["carbon_scale"]),
+            "glass_scale_truth": float(spec["glass_scale"]),
+            "resin_to_fibre_ratio_multiplier_truth": float(spec["resin_to_fibre_ratio_multiplier"]),
+            "stack_kind": spec["kind"],
+            "ply_sequence_bottom_to_top": "-".join(stack),
+        })
     return pd.DataFrame(a_rows), pd.DataFrame(target_rows)
 
 
-def build_layup(cfg: dict, kind: str, ply_count: int,
-                carbon_scale: float = 1.0, glass_scale: float = 1.0) -> dict:
-    """Make a generic layup object accepted by the laminate property helper."""
+def _adjust_cards_for_resin_ratio(cfg: dict, resin_ratio_multiplier: float) -> dict:
+    """Apply an illustrative matrix-rich modulus proxy at fixed ply thickness.
+
+    The configured ply cards are treated as effective properties at the
+    baseline resin fraction. Their notional fibre contribution is inferred
+    with a Voigt mixture, then remixed at the requested resin:fibre ratio.
+    Density and Poisson ratios remain fixed; this is a compliance-study proxy,
+    not a physical resin-uptake or mass model.
+    """
+    factor = float(resin_ratio_multiplier)
+    if not math.isfinite(factor) or factor <= 0:
+        raise ValueError("resin-to-fibre ratio multiplier must be positive and finite")
+    resin_cfg = cfg["resin_model"]
+    base_resin = float(resin_cfg["baseline_resin_volume_fraction"])
+    new_resin = factor * base_resin / (1.0 - base_resin + factor * base_resin)
+    matrix_e = float(resin_cfg["matrix_modulus_Pa"])
+    matrix_g = matrix_e / (2.0 * (1.0 + float(resin_cfg["matrix_poisson_ratio"])))
     cards = copy.deepcopy(cfg["materials"])
+    for card in cards.values():
+        for key in ELASTIC_KEYS:
+            matrix_value = matrix_g if key.startswith("G") else matrix_e
+            baseline = float(card[key])
+            notional_fibre = (baseline - base_resin * matrix_value) / (1.0 - base_resin)
+            adjusted = (1.0 - new_resin) * notional_fibre + new_resin * matrix_value
+            if not math.isfinite(adjusted) or adjusted <= 0:
+                raise ValueError(f"Resin mixture produced invalid {key} for a material card")
+            card[key] = adjusted
+    return cards
+
+
+def build_layup(cfg: dict, kind: str, ply_count: int,
+                carbon_scale: float = 1.0, glass_scale: float = 1.0,
+                resin_ratio_multiplier: float = 1.0) -> dict:
+    """Make a generic layup object accepted by the laminate property helper."""
+    cards = _adjust_cards_for_resin_ratio(cfg, resin_ratio_multiplier)
     for name, card in cards.items():
         factor = carbon_scale if card["family"] == "carbon" else glass_scale
         for key in ELASTIC_KEYS:
@@ -267,12 +336,17 @@ def build_layup(cfg: dict, kind: str, ply_count: int,
 
 
 def section_data(cfg: dict, row: dict, carbon_scale: float | None = None,
-                 glass_scale: float | None = None) -> dict:
+                 glass_scale: float | None = None,
+                 resin_ratio_multiplier: float | None = None) -> dict:
     """Calculate total thickness, mass and CLT section stiffnesses."""
     cscale = float(row.get("carbon_scale_truth", row.get("carbon_scale", 1.0)) if carbon_scale is None else carbon_scale)
     gscale = float(row.get("glass_scale_truth", row.get("glass_scale", 1.0)) if glass_scale is None else glass_scale)
+    resin_multiplier = float(
+        row.get("resin_to_fibre_ratio_multiplier_truth", 1.0)
+        if resin_ratio_multiplier is None else resin_ratio_multiplier
+    )
     kind = str(row["stack_kind"])
-    layup = build_layup(cfg, kind, int(row["ply_count"]), cscale, gscale)
+    layup = build_layup(cfg, kind, int(row["ply_count"]), cscale, gscale, resin_multiplier)
     d_eff, s_eff = effective_bending_shear_stiffness(layup)
     cards = layup["material_cards"]
     thickness = sum(float(cards[p["material"]]["ply_thickness_m"]) for p in layup["plies"])
@@ -292,6 +366,7 @@ def section_data(cfg: dict, row: dict, carbon_scale: float | None = None,
         "mass_kg": mass_per_area * width * float(cfg["beam"]["length_m"]),
         "carbon_scale": cscale,
         "glass_scale": gscale,
+        "resin_to_fibre_ratio_multiplier": resin_multiplier,
     }
 
 
@@ -319,6 +394,7 @@ def _case_signature(cfg: dict, row: dict) -> str:
     """Hash the full FEA definition and case design to prevent stale resume."""
     payload = {
         "beam": cfg["beam"], "mesh": cfg["mesh"], "solver": cfg["solver"],
+        "resin_model": cfg["resin_model"],
         "materials": cfg["materials"], "case": row,
     }
     encoded = json.dumps(
@@ -331,9 +407,10 @@ def _case_signature(cfg: dict, row: dict) -> str:
 def solve_shell_case(mapdl, cfg: dict, row: dict) -> dict:
     """Solve one generic symmetric layered shell cantilever in MAPDL."""
     started = perf_counter()
-    cards = copy.deepcopy(cfg["materials"])
     cscale = float(row.get("carbon_scale_truth", row.get("carbon_scale", 1.0)))
     gscale = float(row.get("glass_scale_truth", row.get("glass_scale", 1.0)))
+    resin_ratio = float(row.get("resin_to_fibre_ratio_multiplier_truth", 1.0))
+    cards = _adjust_cards_for_resin_ratio(cfg, resin_ratio)
     for card in cards.values():
         factor = cscale if card["family"] == "carbon" else gscale
         for key in ELASTIC_KEYS:
@@ -387,7 +464,7 @@ def solve_shell_case(mapdl, cfg: dict, row: dict) -> dict:
     mapdl.set(1, 1)
     uz = float(np.mean([float(mapdl.get_value("NODE", n, "U", "Z")) for n in tips]))
     mapdl.finish()
-    props = section_data(cfg, row, cscale, gscale)
+    props = section_data(cfg, row, cscale, gscale, resin_ratio)
     return {
         **props, "tip_deflection_m": uz,
         "compliance_m_per_N": abs(uz) / load,
@@ -537,7 +614,8 @@ def generate_features_for_scales(cfg: dict, target_row: dict,
                                  cscale: float, gscale: float) -> dict:
     """Recompute a target case's effective section predictors at candidate scales."""
     row = {**target_row, "carbon_scale_truth": cscale, "glass_scale_truth": gscale}
-    props = section_data(cfg, row, cscale, gscale)
+    row["resin_to_fibre_ratio_multiplier_truth"] = 1.0
+    props = section_data(cfg, row, cscale, gscale, resin_ratio_multiplier=1.0)
     return {**target_row, **props}
 
 
@@ -675,9 +753,16 @@ def main() -> None:
     parser.add_argument("--config", default="config.extended_transfer.example.json")
     parser.add_argument("--output-dir", default=str(BASE_DIR))
     parser.add_argument("--stage", choices=("design", "dataset-a", "targets", "fit", "all"), default="all")
+    parser.add_argument("--target-set", choices=(
+        "material_interpolation", "material_extrapolation", "layup_transfer",
+        "geometry_extrapolation", "material_extrapolation_v2",
+    ),
+                        help="Run only this target set (useful for a targeted MAPDL smoke test).")
     parser.add_argument("--max-cases", type=int, default=None,
                         help="Run only the first N cases for the selected FEA stage (smoke test).")
     args = parser.parse_args()
+    if args.target_set is not None and args.stage != "targets":
+        parser.error("--target-set can only be used with --stage targets")
     cfg = json.loads(Path(args.config).read_text())
     validate_config(cfg)
     if args.max_cases is not None and args.max_cases < 1:
@@ -694,7 +779,10 @@ def main() -> None:
     if args.stage in ("dataset-a", "all"):
         run_fea(cfg, a_design, out / "dataset_A.csv", "Dataset A", args.max_cases)
     if args.stage in ("targets", "all"):
-        run_fea(cfg, target_design, out / "targets.csv", "Targets", args.max_cases)
+        target_run = target_design
+        if args.target_set is not None:
+            target_run = target_design[target_design["target_set"] == args.target_set]
+        run_fea(cfg, target_run, out / "targets.csv", "Targets", args.max_cases)
     if args.stage in ("fit", "all"):
         result = fit_evaluate(cfg, out / "dataset_A.csv", out / "targets.csv", out / "model")
         print(json.dumps(result, indent=2))

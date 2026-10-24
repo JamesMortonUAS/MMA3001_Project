@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
+<title>run_extended_transfer_study API</title>
+<style>body{font:16px/1.55 system-ui,sans-serif;max-width:960px;margin:2rem auto;padding:0 1rem;color:#18212b}
+h1,h2{line-height:1.25}section{border-top:1px solid #d6dde5;padding:.6rem 0}code,pre{font-family:ui-monospace,monospace}
+pre{white-space:pre-wrap;background:#f4f6f8;padding:.8rem;border-radius:5px}a{color:#075a9c}</style></head>
+<body><p><a href="index.html">API documentation index</a></p>
+<h1>run_extended_transfer_study</h1><pre>Run the factorial FEA-to-FEA material-transfer experiment.
+
+The script creates an 80-case training grid, four 20-case target sets, and
+compares mechanics-informed, quadratic and Gaussian-process compliance models.
+Two target observations estimate carbon/glass stiffness multipliers. Three
+random calibration pairs are reused for every model. Run MAPDL stages with a
+licensed local MAPDL installation.
+
+Examples (PowerShell, from the repository root):
+    python src/run_extended_transfer_study.py --stage design
+    python src/run_extended_transfer_study.py --stage dataset-a
+    python src/run_extended_transfer_study.py --stage targets
+    python src/run_extended_transfer_study.py --stage fit
+    python src/run_extended_transfer_study.py --stage all</pre>
+<p>Generated from <code>src/run_extended_transfer_study.py</code> by
+<code>scripts/build_api_docs.py</code>. Regenerate after source or docstring changes.</p>
+<section><h2><code>effective_bending_shear_stiffness(layup: dict) -&gt; tuple[float, float]</code></h2><pre>Return CLT effective D11 [N m] and x-z shear rigidity [N/m].
+
+This small helper is kept in the runner so the new experiment is runnable
+even when the legacy laminate_section module is absent from a local clone.
+The experiment uses zero-degree plies; non-zero orientations are rejected.</pre></section>
+<section><h2><code>model_inputs(frame: pd.DataFrame) -&gt; np.ndarray</code></h2><pre>Log-transform positive geometry and section-stiffness predictors.</pre></section>
+<section><h2><code>validate_config(cfg: dict) -&gt; None</code></h2><pre>Validate the supported input domain before generating designs or solving.
+
+Supported runs use positive finite SI dimensions and loads, even ply counts,
+zero-degree plies, the two built-in stack families, and large-deflection
+static MAPDL analysis. The example design is capped at 100 plies.</pre></section>
+<section><h2><code>symmetric_stack(kind: str, ply_count: int) -&gt; list[str]</code></h2><pre>Build a symmetric, bottom-to-top stack from a repeating half-stack.</pre></section>
+<section><h2><code>make_designs(cfg: dict) -&gt; tuple[pd.DataFrame, pd.DataFrame]</code></h2><pre>Return training and target design tables with actual stack metadata.</pre></section>
+<section><h2><code>build_layup(cfg: dict, kind: str, ply_count: int, carbon_scale: float=1.0, glass_scale: float=1.0) -&gt; dict</code></h2><pre>Make a generic layup object accepted by the laminate property helper.</pre></section>
+<section><h2><code>section_data(cfg: dict, row: dict, carbon_scale: float | None=None, glass_scale: float | None=None) -&gt; dict</code></h2><pre>Calculate total thickness, mass and CLT section stiffnesses.</pre></section>
+<section><h2><code>_node_id(i: int, j: int, ny: int) -&gt; int</code></h2><pre>Return the deterministic MAPDL node number for grid indices ``i, j``.</pre></section>
+<section><h2><code>configure_large_deflection(mapdl, cfg: dict) -&gt; None</code></h2><pre>Activate nonlinear geometric static solution controls in MAPDL.</pre></section>
+<section><h2><code>_case_signature(cfg: dict, row: dict) -&gt; str</code></h2><pre>Hash the full FEA definition and case design to prevent stale resume.</pre></section>
+<section><h2><code>solve_shell_case(mapdl, cfg: dict, row: dict) -&gt; dict</code></h2><pre>Solve one generic symmetric layered shell cantilever in MAPDL.</pre></section>
+<section><h2><code>run_fea(cfg: dict, design: pd.DataFrame, output: Path, dataset: str, max_cases: int | None=None) -&gt; None</code></h2><pre>Run/resume a dataset and persist each completed case immediately.</pre></section>
+<section><h2><code>mechanics_matrix(frame: pd.DataFrame, length: float) -&gt; np.ndarray</code></h2><pre>Build bending and shear compliance basis columns for each beam case.</pre></section>
+<section><h2><code>fit_models(data_a: pd.DataFrame, cfg: dict, runtime_seconds: dict[str, float] | None=None) -&gt; dict</code></h2><pre>Fit all model families on Dataset A and optionally record wall time.</pre></section>
+<section><h2><code>cross_validated_training_metrics(data_a: pd.DataFrame, cfg: dict, models: dict, runtime_seconds: dict[str, float] | None=None) -&gt; dict</code></h2><pre>Five-fold CV predictions on Dataset A; no target data enters model selection.</pre></section>
+<section><h2><code>predict(model_name: str, model, frame: pd.DataFrame, cfg: dict) -&gt; np.ndarray</code></h2><pre>Predict positive compliance using a fitted model and case properties.</pre></section>
+<section><h2><code>metrics(y: np.ndarray, pred: np.ndarray) -&gt; dict</code></h2><pre>Return sample count, absolute-error scores, MAPE and coefficient of determination.</pre></section>
+<section><h2><code>generate_features_for_scales(cfg: dict, target_row: dict, cscale: float, gscale: float) -&gt; dict</code></h2><pre>Recompute a target case&#x27;s effective section predictors at candidate scales.</pre></section>
+<section><h2><code>fit_evaluate(cfg: dict, a_path: Path, target_path: Path, out_dir: Path) -&gt; dict</code></h2><pre>Fit on Dataset A and evaluate repeated two-case calibration per target set.</pre></section>
+<section><h2><code>main() -&gt; None</code></h2><pre>Parse the CLI, validate inputs, and run selected design/FEA/model stages.</pre></section></body></html>

@@ -1,7 +1,5 @@
 # Extended transfer study: results and interpretation
 
-> **Historical baseline notice (24 October 2026):** All numerical results in this report come from the earlier linear-static analysis. The runner has since been changed to large-deflection static analysis (`NLGEOM,ON`), but that 180-case sweep with five target sets has not yet been run. These scores must not be presented as validation of the updated formulation. See the [current experiment guide](extended_transfer_experiment.md) and [test/build record](test_report.md) for the new setup and status.
-
 **Run analysed:** `results/property_transfer_extended/` from the supplied `results(5).zip` archive. 
 The archive also contains an earlier `property_transfer_grid` run; it is not combined with the extended-study results below.
 

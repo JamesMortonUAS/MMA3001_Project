@@ -1,21 +1,14 @@
-# Test and documentation build record
+# Test and report build record
 
-**Recorded:** 25 October 2026  
-**Scope:** source-level unit checks, documentation generation, and report build.
+Recorded 25 October 2026.
 
-## Results
+| Check | Result |
+|---|---|
+| `python -m unittest discover -s tests -v` | 11 passed, 0 failed |
+| Python syntax check of the transfer runner and API builder | Passed |
+| `python scripts/build_api_docs.py` | Passed |
+| Two-pass LaTeX build of `latex/project_report.tex` | Passed; 7-page PDF |
 
-| Check | Command | Result |
-|---|---|---|
-| Python syntax | `python -m py_compile src/run_extended_transfer_study.py scripts/build_api_docs.py` | Passed |
-| Unit suite | `python -m unittest discover -s tests -v` | 11 passed, 0 failed (solver-independent tests) |
-| API HTML generation | `python scripts/build_api_docs.py` | Passed; API index and source pages generated |
-| LaTeX report build | `pdflatex -interaction=nonstopmode -halt-on-error -output-directory=latex latex/project_report.tex` (run twice to resolve references) | Passed; 7-page PDF generated |
+The unit checks exercise source-level design and model logic in the maintained source tree. They do not launch MAPDL, verify solver accuracy, or independently reproduce the archived sweep.
 
-The unit suite covers study-design construction, symmetric layups, effective section properties, the resin-ratio stiffness proxy, configuration validation, large-deflection command generation, case-signature handling, and model fitting and timing instrumentation.
-
-## Verification limits
-
-The unit tests do not run MAPDL. They check input generation and solver-command setup, not the convergence or physical accuracy of a nonlinear solution. A complete large-deflection dataset and model-validation analysis are not included in this submission. The historical linear-static CSVs and metrics are reported separately and must not be interpreted as validation of the updated nonlinear setup.
-
-Mesh convergence, reaction balance, element orientation, supports, load application, and nonlinear solution histories remain solver-level checks for a complete future run.
+The submission report describes the completed 80-training/80-target linear-static experiment and its model evaluation, archived under `results/property_transfer_extended/`. Source-level checks are distinct from validation against the held-out target responses. The report documents limits on mesh evidence and physical small-deflection interpretation.

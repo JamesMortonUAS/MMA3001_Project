@@ -24,7 +24,7 @@ It is not a constant linear spring rate: large-deflection compliance can depend 
 
 | Dataset / target set | Completed | Compliance min / median / max (m/N) | Max \(|\delta|/L\) | Cases with \(|\delta|/L>0.1\) | Median recorded solve time |
 |---|---:|---:|---:|---:|---:|
-| Dataset A | 80/80 | 5.205e-5 / 6.139e-4 / 1.649e-2 | 0.660 | 22/80 | 11.66 s mean |
+| Dataset A | 80/80 | 5.205e-5 / 6.139e-4 / 1.649e-2 | 0.660 | 22/80 | 11.59 s |
 | Material interpolation | 20/20 | 6.940e-5 / 6.136e-4 / 1.401e-2 | 0.560 | 6/20 | 12.05 s |
 | Material extrapolation | 20/20 | 5.381e-5 / 4.643e-4 / 1.178e-2 | 0.471 | 5/20 | 12.38 s |
 | Layup transfer | 20/20 | 4.317e-5 / 3.277e-4 / 9.044e-3 | 0.362 | 4/20 | 12.29 s |

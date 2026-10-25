@@ -1,22 +1,22 @@
 # Project brief traceability
 
-This table maps the MMA3001 project brief to the current hidden-property FEA transfer study. “In progress” means the repository contains a method or draft, but further analysis or student review is still required.
+This table maps the MMA3001 project brief to the submission snapshot and distinguishes completed evidence from proposed work.
 
-| Brief requirement | Repository evidence | Status / remaining action |
+| Brief requirement | Repository evidence | Status |
 |---|---|---|
-| Define the engineering problem and scope | `README.md`; `latex/project_report.tex` | Benchmark and limits are defined. Confirm coordinator approval of the chosen scope and record the decision. |
-| Define inputs, outputs, units, and valid domain | `config.hidden_property.example.json`; `layup.json`; report Sections 2–4 | SI parameters and 97-case study design are specified. Check the engineering relevance of bounds and assess small-deflection assumptions after running FEA. |
-| Implement and explain a computational method | `src/run_property_transfer_study.py`; `src/run_laminate_shell_sweep.py`; `src/laminate_section.py`; `docs/property_transfer_study.md` | Scripts implement the regular-grid FEA generation, section-property regression, one-point common-scale calibration, and regional validation workflow. Verify locally with the intended MAPDL installation. |
-| Compare against a baseline or reference | `src/run_property_transfer_study.py` | Dataset A five-fold cross-validation and nominal-vs-calibrated predictions are specified. Generate Dataset A/B and report actual metrics; no current grid results are committed. |
-| Validate and state limitations | `latex/project_report.tex`; `docs/test_report.md` | Validation protocol separates interpolation and extrapolation; this is FEA-to-FEA only. Run the sweep, examine mesh sensitivity and `abs(delta)/L`, and do not claim physical validation. |
-| Analyse performance or optimisation | `src/optimize_mass.py`; report scope | Optimisation code is supplementary. No mass-optimal design is claimed by the hidden-property transfer experiment; define requirements and verify the predictor first. |
-| Provide functional source and documentation | `src/`; `docs/`; `README.md` | Included. Student should inspect scripts, API documentation, and local results. |
-| Provide tests and test evidence | `tests/`; `docs/test_report.md`; `.github/workflows/` | Solver-independent tests do not launch MAPDL. Run them and retain the current test report. |
-| Provide licensing | `LICENSE` | MIT license covers original project material as stated in the file; check third-party material and solver-output provenance separately. |
-| Provide written project documentation | `latex/project_report.tex`; compiled `latex/project_report.pdf` | Updated method draft is six pages before adding current FEA results. Recheck length and pagination after results are added. |
-| Disclose AI use and reflect | Report Section 8 | Use disclosure is included; student should add a personal reflection on assistance, verification, and decisions. |
-| Prepare and present the project | Project brief; report and repository | Prepare a short presentation with problem, model, data design, calibration, evaluation, limitations, and evidence from the completed run. |
+| Define an engineering problem and project scope | `README.md`; report Introduction | Complete. The report frames a straight composite cantilever as a methodology benchmark and identifies curved gear application as future work. |
+| Define inputs, outputs, assumptions, and domain | `docs/extended_transfer_experiment.md`; report Sections 2–4; example configuration | Specified. The nonlinear design uses length, load, width, ply count, material scales, layup, and section properties; output is tip compliance/deflection. Assumed material cards are numerical inputs, not measured properties. |
+| Implement a computational method | `src/run_extended_transfer_study.py`; `src/laminate_section.py`; `src/fit_corrected_surrogate.py` | Implemented and documented. The MAPDL model uses layered SHELL181 elements with large-deflection static analysis. |
+| Create a planned design of experiments | `docs/extended_transfer_experiment.md`; design-generation code and tests | Specified: 80 training cases and five 20-case target sets (180 planned analyses total). |
+| Fit and compare predictive models | `src/fit_corrected_surrogate.py`; report Methods and historical Results | Method implemented for mechanics-informed regression, quadratic response surface, and Gaussian process. Comparative quantitative metrics in the report are from the historical linear-static baseline only. |
+| Calibrate with limited observations and assess unseen cases | Report Section 5; historical result tables | Demonstrated on the historical FEA-to-FEA baseline using two observations per repeat and 18 held-out cases. Pair identifiability problems are discussed. |
+| Validate and state limits | Report Discussion; `docs/test_report.md` | Unit-level checks and historical baseline validation are documented. The full large-deflection experiment has no complete dataset or validation results in this submission; no physical validation is claimed. |
+| Analyse engineering performance or optimise | `src/optimize_mass.py`; report scope and next steps | Optimisation is supplementary code only. No mass-optimal design, landing stroke, impact-energy absorption, or curved-gear performance is claimed. |
+| Provide source, documentation, license, and tests | `src/`; `docs/`; `tests/`; `docs/api/`; `LICENSE` | Included. Tests are solver-independent and do not establish MAPDL solution accuracy. |
+| Provide a written report of suitable length | `latex/project_report.pdf`; `latex/project_report.tex` | Included. The compiled report is 7 pages total, within the brief's 5–10 page range (excluding references/appendices). |
+| Reflect on AI use | Report Section 8 | Included. It describes assistance used, human decisions, verification, and limitations; the student should confirm the reflection matches their own experience. |
+| Prepare presentation and submit repository | Repository root and project brief | Repository content is organized for handover. The student should include the public repository URL and a repository ZIP in the Moodle submission as requested by the brief. |
 
 ## Evidence boundary
 
-The configured current workflow contains 72 Dataset A training analyses and 25 Dataset B analyses. The current hidden-property grid has not yet been run in the repository, so no fitted correction or validation metrics are available. Earlier studies in `results/` used different setups and should remain identified as historical or complementary. No physical test data are included.
+The report includes only the completed historical linear-static, four-set FEA-to-FEA results as quantitative model evidence. The new large-deflection experiment is documented as a reproducible design and implementation, but its complete dataset and model evaluation are unavailable in this submission. No incomplete nonlinear-run outputs are used in the report. No physical test data are included.
